@@ -2,7 +2,7 @@
 MCP (Model Context Protocol) Configuration
 
 This module provides configuration for connecting to various MCP servers
-including ArXiv and Hacker News.
+including Hacker News.
 """
 
 import os
@@ -44,14 +44,6 @@ def get_mcp_config() -> dict[str, dict[str, Any]]:
     common_env = get_mcp_env()
     
     config = {
-        # ArXiv MCP Server - https://github.com/blazickjp/arxiv-mcp-server
-        # Provides tools for searching and retrieving ArXiv papers
-        "arxiv": {
-            "transport": "stdio",
-            "command": "uvx",
-            "args": ["arxiv-mcp-server"],
-            "env": common_env.copy(),
-        },
         # Hacker News MCP Server - https://github.com/erithwik/mcp-hn
         # Provides tools for fetching HN stories and comments
         "hackernews": {
@@ -70,7 +62,7 @@ def get_single_server_config(server_name: str) -> dict[str, Any]:
     Get configuration for a single MCP server.
 
     Args:
-        server_name: Name of the server ('arxiv' or 'hackernews').
+        server_name: Name of the server (e.g., 'hackernews').
 
     Returns:
         Configuration dictionary for the specified server.
@@ -88,10 +80,6 @@ def get_single_server_config(server_name: str) -> dict[str, Any]:
 # Alternative configurations for different deployment scenarios
 ALTERNATIVE_CONFIGS = {
     # SSE transport for remote MCP servers
-    "arxiv_sse": {
-        "transport": "sse",
-        "url": os.getenv("ARXIV_MCP_URL", "http://localhost:8000/mcp"),
-    },
     "hackernews_sse": {
         "transport": "sse",
         "url": os.getenv("HN_MCP_URL", "http://localhost:8001/mcp"),

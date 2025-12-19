@@ -32,8 +32,9 @@ from src.agent.subagents import (
     get_main_agent_tools,
 )
 from src.prompts import load_prompt
+from src.tools.arxiv_api import get_arxiv_paper_tool, search_arxiv_papers_tool
+from src.tools.hf_blog import get_huggingface_blog_posts_tool
 from src.tools.hf_daily_papers import get_huggingface_papers_tool
-
 
 # Available models on Aliyun DashScope
 ALIYUN_MODELS = {
@@ -66,18 +67,18 @@ def _get_model_config(
             "https://dashscope.aliyuncs.com/compatible-mode/v1"
         )
         api_key = os.getenv("ALIYUN_API_KEY") or os.getenv("DASHSCOPE_API_KEY")
-        
+
         if not api_key:
             raise ValueError(
                 "ALIYUN_API_KEY or DASHSCOPE_API_KEY environment variable not set"
             )
-        
+
         resolved_model = model_name
         if model_name in ALIYUN_MODELS:
             resolved_model = ALIYUN_MODELS[model_name]
         elif model_name is None:
             resolved_model = ALIYUN_MODELS[DEFAULT_ALIYUN_MODEL]
-        
+
         # Create ChatOpenAI instance for custom API endpoints
         # deepagents' create_deep_agent accepts BaseChatModel directly
         llm = ChatOpenAI(
@@ -99,13 +100,11 @@ def _get_model_config(
 
 
 def create_research_agent(
-    arxiv_mcp_tools: Optional[list] = None,
     hn_mcp_tools: Optional[list] = None,
     model_provider: str = "anthropic",
     model_name: Optional[str] = None,
     system_prompt: Optional[str] = None,
     prompt_template: str = "research_agent",
-    prompt_variables: Optional[dict[str, Any]] = None,
     checkpointer: Optional[BaseCheckpointSaver] = None,
     store: Optional[BaseStore] = None,
     debug: bool = False,
@@ -115,9 +114,9 @@ def create_research_agent(
 
     Architecture:
     - Main Agent: Coordinator with search/discovery tools
-        - Tools: HF papers list, ArXiv search, HN stories
+        - Tools: HF papers list, ArXiv search/paper (native), HN stories
     - Content Reader Sub-agent: Deep reading and summarization
-        - Tools: Jina Reader, ArXiv read/download
+        - Tools: Jina Reader (for URL content)
 
     This separation ensures:
     1. Main agent's context stays clean (only summaries, not raw content)
@@ -134,16 +133,13 @@ def create_research_agent(
     - For disk persistence (across restarts), use SqliteSaver or PostgresSaver.
 
     Args:
-        arxiv_mcp_tools: ArXiv MCP tools (will be split between main/sub agent).
         hn_mcp_tools: Hacker News MCP tools (will be split between main/sub agent).
         model_provider: LLM provider ('anthropic', 'openai', or 'aliyun').
         model_name: Specific model to use.
         system_prompt: Custom system prompt. If provided, overrides prompt_template.
         prompt_template: Name of the prompt template to use (without .md extension).
-                        Defaults to 'research_agent'.
-        prompt_variables: Variables to pass to the Jinja2 template for rendering.
-                         Supports: capabilities, additional_tools, custom_instructions,
-                         output_format.
+                        Defaults to 'research_agent'. Edit the template file directly
+                        at src/prompts/templates/<template_name>.md to modify prompts.
         checkpointer: Checkpointer for persisting conversation state (e.g., MemorySaver).
                      Required for multi-turn conversations.
         store: Store for persistent file storage (e.g., InMemoryStore).
@@ -153,21 +149,17 @@ def create_research_agent(
 
     Returns:
         Configured DeepAgent instance with subagents.
-    
+
     Example:
         >>> from langgraph.checkpoint.memory import MemorySaver
         >>> from langgraph.store.memory import InMemoryStore
-        >>> 
+        >>>
         >>> checkpointer = MemorySaver()
         >>> store = InMemoryStore()
         >>> agent = create_research_agent(
-        ...     arxiv_mcp_tools=arxiv_tools,
         ...     hn_mcp_tools=hn_tools,
         ...     checkpointer=checkpointer,
         ...     store=store,
-        ...     prompt_variables={
-        ...         "custom_instructions": "Focus on papers from 2024 onwards.",
-        ...     }
         ... )
         >>> # Invoke with thread_id for multi-turn conversation
         >>> result = agent.invoke(
@@ -176,20 +168,17 @@ def create_research_agent(
         ... )
     """
     # Create Content Reader subagent with reading tools
-    content_reader = create_content_reader_subagent(
-        arxiv_mcp_tools=arxiv_mcp_tools,
-        hn_mcp_tools=hn_mcp_tools,
-    )
+    content_reader = create_content_reader_subagent()
     subagents = [content_reader]
 
-    # Build main agent tools: Discovery/Search tools only
-    # Main agent gets: HF papers list + search/discovery tools from MCP
-    main_tools = [get_huggingface_papers_tool]
-
-    # Add discovery tools from ArXiv MCP (search_papers)
-    arxiv_main_tools = get_main_agent_tools(arxiv_mcp_tools)
-    if arxiv_main_tools:
-        main_tools.extend(arxiv_main_tools)
+    # Build main agent tools: Discovery/Search tools + ArXiv tools
+    # Main agent gets: HF papers list + ArXiv tools (native) + HN discovery tools
+    main_tools = [
+        get_huggingface_papers_tool,
+        get_huggingface_blog_posts_tool,
+        get_arxiv_paper_tool,
+        search_arxiv_papers_tool,
+    ]
 
     # Add discovery tools from HN MCP (getTopStories, getBestStories, etc.)
     hn_main_tools = get_main_agent_tools(hn_mcp_tools)
@@ -199,10 +188,9 @@ def create_research_agent(
     # Get model configuration
     model_config = _get_model_config(model_provider, model_name)
 
-    # Load and render the system prompt
+    # Load the system prompt from template
     if system_prompt is None:
-        prompt_vars = prompt_variables or {}
-        system_prompt = load_prompt(prompt_template, **prompt_vars)
+        system_prompt = load_prompt(prompt_template)
 
     # Configure backend for persistent file storage
     # When store is provided, use CompositeBackend to route /memories/ to StoreBackend
@@ -231,7 +219,6 @@ def create_research_agent(
 
 def run_research(
     query: str,
-    arxiv_mcp_tools: Optional[list] = None,
     hn_mcp_tools: Optional[list] = None,
     model_provider: str = "anthropic",
     model_name: Optional[str] = None,
@@ -252,7 +239,6 @@ def run_research(
 
     Args:
         query: The research question or topic to investigate.
-        arxiv_mcp_tools: ArXiv MCP tools for paper research.
         hn_mcp_tools: Hacker News MCP tools for web content.
         model_provider: LLM provider to use ('anthropic', 'openai', or 'aliyun').
         model_name: Specific model name.
@@ -266,7 +252,6 @@ def run_research(
     """
     if agent is None:
         agent = create_research_agent(
-            arxiv_mcp_tools=arxiv_mcp_tools,
             hn_mcp_tools=hn_mcp_tools,
             model_provider=model_provider,
             model_name=model_name,
@@ -290,7 +275,6 @@ def run_research(
 
 async def run_research_async(
     query: str,
-    arxiv_mcp_tools: Optional[list] = None,
     hn_mcp_tools: Optional[list] = None,
     model_provider: str = "anthropic",
     model_name: Optional[str] = None,
@@ -304,7 +288,6 @@ async def run_research_async(
 
     Args:
         query: The research question or topic to investigate.
-        arxiv_mcp_tools: ArXiv MCP tools for paper research.
         hn_mcp_tools: Hacker News MCP tools for web content.
         model_provider: LLM provider to use ('anthropic', 'openai', or 'aliyun').
         model_name: Specific model name.
@@ -318,7 +301,6 @@ async def run_research_async(
     """
     if agent is None:
         agent = create_research_agent(
-            arxiv_mcp_tools=arxiv_mcp_tools,
             hn_mcp_tools=hn_mcp_tools,
             model_provider=model_provider,
             model_name=model_name,

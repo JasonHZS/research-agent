@@ -4,9 +4,10 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 
 ## Features
 
-- **ArXiv Search**: Search and retrieve academic papers from ArXiv
-- **Hacker News Integration**: Get trending stories and discussions
+- **ArXiv Search**: Search and retrieve academic papers using ArXiv's official API
+- **Hacker News Integration**: Get trending stories and discussions via MCP
 - **Hugging Face Daily Papers**: Fetch daily featured AI/ML papers with titles and abstracts
+- **Hugging Face Blog**: Browse official and community blog posts with metadata
 - **Multi-LLM Support**: Works with Aliyun (qwen-max, kimi-k2-thinking), Anthropic Claude, and OpenAI GPT
 - **Modular Architecture**: High cohesion, low coupling design for easy extension
 
@@ -16,22 +17,31 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 src/
 ├── agent/
 │   ├── __init__.py
-│   └── research_agent.py    # Main agent implementation with LangGraph
+│   ├── research_agent.py         # Main agent implementation with LangGraph
+│   └── subagents/
+│       └── content_reader_agent.py  # Sub-agent for content reading
 ├── config/
 │   ├── __init__.py
-│   └── mcp_config.py        # MCP server configurations
+│   └── mcp_config.py             # MCP server configurations
+├── prompts/
+│   ├── loader.py                 # Jinja2 template loader
+│   └── templates/                # Markdown prompt templates
 ├── tools/
 │   ├── __init__.py
-│   └── hf_daily_papers.py   # Hugging Face daily papers tool
-└── main.py                   # CLI entry point
+│   ├── arxiv_api.py              # ArXiv API search and fetch tools
+│   ├── hf_blog.py                # Hugging Face blog listing tool
+│   ├── hf_daily_papers.py        # Hugging Face daily papers tool
+│   └── jina_reader.py            # Jina AI web reader tool
+└── main.py                       # CLI entry point
 ```
 
 ## Prerequisites
 
 - Python 3.10+
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip
-- Node.js (for Hacker News MCP server)
+- Node.js (for Hacker News MCP server via npx)
 - API key for Aliyun DashScope (default), Anthropic, or OpenAI
+- Jina API key (for web content reading)
 
 ## Installation
 
@@ -56,22 +66,12 @@ uv pip install -e .
 
 ### 3. Install MCP Servers
 
-#### ArXiv MCP Server
-
-```bash
-# Install via uvx (recommended)
-uvx arxiv-mcp-server
-
-# Or install globally
-pip install arxiv-mcp-server
-```
-
 #### Hacker News MCP Server
 
 ```bash
 # Will be installed automatically via npx when the agent runs
 # Or install globally:
-npm install -g mcp-hn
+npm install -g mcp-hacker-news
 ```
 
 ### 4. Configure Environment Variables
@@ -94,6 +94,10 @@ ALIYUN_API_KEY=your-aliyun-dashscope-api-key
 # Or use alternative providers:
 # ANTHROPIC_API_KEY=your-anthropic-api-key
 # OPENAI_API_KEY=your-openai-api-key
+
+# Jina API Key (for web content reading)
+# Get your key from: https://jina.ai/
+JINA_API_KEY=your-jina-api-key
 ```
 
 ## Usage
@@ -115,7 +119,7 @@ uv run python -m src.main -p openai
 ### Single Query Mode
 
 ```bash
-uv run python src/main.py -q "帮我深度总结一下 hacker news 和 huggingface 上今天的热门话题和论文"
+uv run python src/main.py -q "帮我深度总结一下 hacker news 和 huggingface 上今天top1的热门话题和论文" -v
 ```
 
 ### Programmatic Usage
@@ -148,13 +152,29 @@ asyncio.run(main())
 
 ```python
 from src.tools.hf_daily_papers import fetch_huggingface_daily_papers
+from src.tools.hf_blog import fetch_huggingface_blog_posts
+from src.tools.arxiv_api import search_arxiv, fetch_arxiv_paper
 
-# Fetch papers for a specific date
+# Fetch Hugging Face daily papers for a specific date
 papers = fetch_huggingface_daily_papers("2025-12-15")
 for paper in papers:
     print(f"Title: {paper['title']}")
     print(f"Abstract: {paper['abstract'][:200]}...")
-    print()
+
+# Fetch Hugging Face blog posts
+blog_posts = fetch_huggingface_blog_posts(limit=10)
+for post in blog_posts:
+    print(f"{post['title']} - {post['date']} ({post['upvotes']} upvotes)")
+
+# Search ArXiv papers
+results = search_arxiv("LLM agents", max_results=5, sort_by="submittedDate")
+for paper in results:
+    print(f"{paper['title']} [{paper['arxiv_id']}]")
+
+# Fetch a specific ArXiv paper
+paper = fetch_arxiv_paper("2402.02716")
+print(f"Title: {paper['title']}")
+print(f"Authors: {', '.join(paper['authors'][:3])}")
 ```
 
 ## Available Tools
@@ -163,14 +183,17 @@ for paper in papers:
 
 | Tool | Description |
 |------|-------------|
+| `search_arxiv_papers_tool` | Search ArXiv papers using official API with query syntax support |
+| `get_arxiv_paper_tool` | Fetch detailed metadata for a specific ArXiv paper by ID |
 | `get_huggingface_papers_tool` | Fetches daily papers from Hugging Face with titles and abstracts |
+| `get_huggingface_blog_posts_tool` | Lists Hugging Face blog posts with title, date, upvotes, and URL |
+| `get_jina_reader_tool` | Reads and extracts content from web URLs as markdown |
 
 ### MCP Tools (via external servers)
 
 | Server | Tools | Description |
 |--------|-------|-------------|
-| ArXiv MCP | `search_arxiv`, `get_paper` | Search and retrieve ArXiv papers |
-| Hacker News MCP | `get_stories`, `get_comments` | Fetch HN stories and discussions |
+| Hacker News MCP | `getTopStories`, `getBestStories`, `getNewStories`, etc. | Fetch HN stories and discussions |
 
 ## Example Queries
 
@@ -206,7 +229,7 @@ ruff format src/
 ### MCP Tools Not Loading
 
 1. Ensure Node.js is installed for the Hacker News MCP server
-2. Check that `uvx` is available for the ArXiv MCP server
+2. Check that `npx` is available in your PATH
 3. Verify your PATH includes the necessary executables
 
 ### API Key Errors
@@ -214,6 +237,7 @@ ruff format src/
 1. Ensure your `.env` file exists and contains valid API keys
 2. Check that `python-dotenv` is installed
 3. Verify the API key has sufficient quota/credits
+4. For Jina Reader, ensure `JINA_API_KEY` is set
 
 ## License
 
@@ -223,6 +247,7 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 - [LangChain](https://langchain.com/) - LLM framework
 - [LangGraph](https://langchain-ai.github.io/langgraph/) - Agent graph framework
-- [ArXiv MCP Server](https://github.com/blazickjp/arxiv-mcp-server) - ArXiv integration
-- [mcp-hn](https://github.com/erithwik/mcp-hn) - Hacker News integration
-- [Hugging Face](https://huggingface.co/) - Daily papers source
+- [ArXiv API](https://info.arxiv.org/help/api/index.html) - Academic paper search
+- [mcp-hacker-news](https://github.com/erithwik/mcp-hn) - Hacker News integration
+- [Hugging Face](https://huggingface.co/) - Daily papers and blog source
+- [Jina AI](https://jina.ai/) - Web content reader

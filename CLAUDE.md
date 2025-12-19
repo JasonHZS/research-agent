@@ -114,14 +114,20 @@ Each MCP server is loaded independently in `src/main.py` via `_load_mcp_server_t
 
 Prompts are managed via Jinja2 templates in `src/prompts/templates/`:
 
-- `research_agent.md`: Main agent system prompt
-- `content_reader.md`: Sub-agent system prompt
-- `paper_summary.md`: Template for paper summaries
+- `research_agent.md`: Main agent system prompt (static, no template variables)
+- `content_reader.md`: Sub-agent system prompt (uses `{{ summary_format }}` variable)
+- `summary.md`: Summary format template, embedded into content_reader.md
 
-Load prompts using `src/prompts/loader.py`:
+**Main Agent**: Edit `research_agent.md` directly to modify the prompt.
+
+**Sub-agent**: Uses template composition - `summary.md` is loaded and injected into `content_reader.md`:
 ```python
 from src.prompts import load_prompt
-system_prompt = load_prompt("research_agent", custom_var="value")
+# Main agent: direct loading
+system_prompt = load_prompt("research_agent")
+# Sub-agent: template composition
+summary_format = load_prompt("summary")
+system_prompt = load_prompt("content_reader", summary_format=summary_format)
 ```
 
 ### LLM Provider Support

@@ -30,14 +30,10 @@ from src.config.mcp_config import get_single_server_config
 class MCPToolsContext:
     """Container for MCP clients and their tools."""
 
-    arxiv_client: Optional[MultiServerMCPClient] = None
-    arxiv_tools: list = None
     hn_client: Optional[MultiServerMCPClient] = None
     hn_tools: list = None
 
     def __post_init__(self):
-        if self.arxiv_tools is None:
-            self.arxiv_tools = []
         if self.hn_tools is None:
             self.hn_tools = []
 
@@ -87,13 +83,10 @@ async def initialize_mcp_tools() -> MCPToolsContext:
     """
     ctx = MCPToolsContext()
 
-    # Load ArXiv MCP tools
-    ctx.arxiv_client, ctx.arxiv_tools = await _load_mcp_server_tools("arxiv")
-
     # Load Hacker News MCP tools
     ctx.hn_client, ctx.hn_tools = await _load_mcp_server_tools("hackernews")
 
-    total_tools = len(ctx.arxiv_tools) + len(ctx.hn_tools)
+    total_tools = len(ctx.hn_tools)
     if total_tools == 0:
         print("  Continuing with built-in tools only...")
 
@@ -123,7 +116,6 @@ def _create_session_agent(
         Configured agent instance.
     """
     return create_research_agent(
-        arxiv_mcp_tools=mcp_ctx.arxiv_tools,
         hn_mcp_tools=mcp_ctx.hn_tools,
         model_provider=model_provider,
         model_name=model_name,
