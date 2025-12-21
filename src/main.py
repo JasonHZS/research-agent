@@ -22,8 +22,13 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 
-from src.agent.research_agent import create_research_agent, run_research_async
+from src.agent.research_agent import (
+    create_research_agent,
+    run_research_async,
+    run_research_stream,
+)
 from src.config.mcp_config import get_single_server_config
+from src.utils.stream_display import StreamDisplay
 
 
 @dataclass
@@ -100,6 +105,7 @@ def _create_session_agent(
     checkpointer: MemorySaver,
     store: InMemoryStore,
     debug: bool = False,
+    enable_thinking: bool = False,
 ) -> Any:
     """
     Create a research agent configured for multi-turn conversation.
@@ -111,6 +117,7 @@ def _create_session_agent(
         checkpointer: MemorySaver for conversation state.
         store: InMemoryStore for file persistence.
         debug: Enable debug mode for detailed execution logs.
+        enable_thinking: Enable thinking mode for supported models.
 
     Returns:
         Configured agent instance.
@@ -122,6 +129,7 @@ def _create_session_agent(
         checkpointer=checkpointer,
         store=store,
         debug=debug,
+        enable_thinking=enable_thinking,
     )
 
 
@@ -130,6 +138,7 @@ async def main(
     model_provider: str = "aliyun",
     model_name: Optional[str] = None,
     verbose: bool = False,
+    enable_thinking: bool = False,
 ) -> None:
     """
     Main function to run the research agent.
@@ -145,6 +154,8 @@ async def main(
         model_provider: LLM provider ('aliyun', 'anthropic', or 'openai').
         model_name: Specific model name (e.g., 'qwen-max', 'kimi-k2-thinking').
         verbose: If True, prints detailed execution logs including tool calls.
+        enable_thinking: If True, enables thinking mode for supported models
+                        (e.g., DeepSeek-v3, kimi-k2-thinking via DashScope).
     """
     # Load environment variables
     load_dotenv()
@@ -166,7 +177,8 @@ async def main(
 
     print("=" * 60)
     print("Research Agent - Powered by DeepAgents")
-    print(f"Provider: {model_provider} | Model: {model_name or 'default'}")
+    thinking_str = " | Thinking: ON" if enable_thinking else ""
+    print(f"Provider: {model_provider} | Model: {model_name or 'default'}{thinking_str}")
     print("=" * 60)
 
     # Initialize MCP tools (per server)
@@ -189,6 +201,7 @@ async def main(
         checkpointer=checkpointer,
         store=store,
         debug=verbose,
+        enable_thinking=enable_thinking,
     )
 
     try:
@@ -200,6 +213,7 @@ async def main(
                 query=query,
                 agent=agent,
                 thread_id=thread_id,
+                enable_thinking=enable_thinking,
             )
             print("\n" + result)
         else:
@@ -224,13 +238,26 @@ async def main(
                         continue
 
                     print("\n🔍 Researching...\n")
-                    result = await run_research_async(
+
+                    # Use streaming to show execution progress with token-level output
+                    display = StreamDisplay(verbose=verbose)
+                    final_content = ""
+
+                    # Mixed mode streaming: updates for tool calls, messages for tokens
+                    async for mode, chunk in run_research_stream(
                         query=user_input,
                         agent=agent,
                         thread_id=thread_id,
-                    )
+                    ):
+                        result = display.process_stream_chunk(mode, chunk)
+                        if result:
+                            final_content = result
+
+                    # Show final content separator (content already printed via streaming)
                     print("\n" + "-" * 60)
-                    print(result)
+                    if final_content:
+                        # Content was already streamed, just show separator
+                        pass
                     print("-" * 60)
                 except KeyboardInterrupt:
                     print("\n\nGoodbye!")
@@ -270,6 +297,11 @@ def run_cli() -> None:
         action="store_true",
         help="Enable verbose mode to show detailed execution logs (tool calls, agent steps)",
     )
+    parser.add_argument(
+        "--enable-thinking",
+        action="store_true",
+        help="Enable thinking mode for supported models (e.g., DeepSeek-v3, kimi-k2-thinking)",
+    )
     args = parser.parse_args()
 
     asyncio.run(
@@ -278,6 +310,7 @@ def run_cli() -> None:
             model_provider=args.model_provider,
             model_name=args.model_name,
             verbose=args.verbose,
+            enable_thinking=args.enable_thinking,
         )
     )
 

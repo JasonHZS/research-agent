@@ -9,6 +9,7 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 - **Hugging Face Daily Papers**: Fetch daily featured AI/ML papers with titles and abstracts
 - **Hugging Face Blog**: Browse official and community blog posts with metadata
 - **Multi-LLM Support**: Works with Aliyun (qwen-max, kimi-k2-thinking), Anthropic Claude, and OpenAI GPT
+- **Thinking Mode**: Optional thinking mode for supported models (qwen-max, DeepSeek-v3.2, kimi-k2-thinking)
 - **Modular Architecture**: High cohesion, low coupling design for easy extension
 
 ## Architecture
@@ -111,6 +112,10 @@ uv run python -m src.main
 # Use kimi-k2-thinking model
 uv run python -m src.main -m kimi-k2-thinking
 
+# Enable thinking mode (shows model's reasoning process)
+uv run python -m src.main --enable-thinking
+uv run python -m src.main -m kimi-k2-thinking --enable-thinking
+
 # Use Anthropic or OpenAI instead
 uv run python -m src.main -p anthropic
 uv run python -m src.main -p openai
@@ -119,7 +124,10 @@ uv run python -m src.main -p openai
 ### Single Query Mode
 
 ```bash
-uv run python src/main.py -q "帮我深度总结一下 hacker news 和 huggingface 上今天top1的热门话题和论文" -v
+uv run python -m src.main -q "帮我深度总结一下 hacker news 和 huggingface 上今天的热门话题和论文的主要内容，并形成一篇详细的报告" -v
+
+# With thinking mode enabled
+uv run python -m src.main -q "分析最新的 LLM 论文趋势" --enable-thinking -v
 ```
 
 ### Programmatic Usage
@@ -142,6 +150,7 @@ async def main():
             mcp_tools=tools,
             model_provider="aliyun",  # or "anthropic", "openai"
             model_name="qwen-max",     # or "kimi-k2-thinking"
+            enable_thinking=True,      # Enable thinking mode (optional)
         )
         print(result)
 

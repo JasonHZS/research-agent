@@ -19,6 +19,7 @@ Multi-turn Conversation Support:
 """
 
 import os
+from collections.abc import AsyncGenerator
 from typing import Any, Optional
 
 from deepagents import create_deep_agent
@@ -48,6 +49,7 @@ DEFAULT_ALIYUN_MODEL = "qwen-max"
 def _get_model_config(
     model_provider: str = "anthropic",
     model_name: Optional[str] = None,
+    enable_thinking: bool = False,
 ) -> dict[str, Any]:
     """
     Get model configuration for the specified provider.
@@ -55,6 +57,8 @@ def _get_model_config(
     Args:
         model_provider: One of 'aliyun', 'anthropic', or 'openai'.
         model_name: Specific model name.
+        enable_thinking: Whether to enable thinking mode (only supported by some models
+                        like qwen-max,DeepSeek-v3.2, kimi-k2-thinking via DashScope).
 
     Returns:
         Dictionary with model configuration for deepagents.
@@ -79,12 +83,19 @@ def _get_model_config(
         elif model_name is None:
             resolved_model = ALIYUN_MODELS[DEFAULT_ALIYUN_MODEL]
 
+        # Build extra_body for enable_thinking support
+        extra_body = {"enable_thinking": True} if enable_thinking else None
+
         # Create ChatOpenAI instance for custom API endpoints
         # deepagents' create_deep_agent accepts BaseChatModel directly
+        # streaming=True ensures the underlying API call uses stream=True
+        # which is required for token-level streaming output
         llm = ChatOpenAI(
             model=resolved_model,
             api_key=api_key,
             base_url=base_url,
+            extra_body=extra_body,
+            streaming=True,
         )
         return {"model": llm}
     elif model_provider == "anthropic":
@@ -108,6 +119,7 @@ def create_research_agent(
     checkpointer: Optional[BaseCheckpointSaver] = None,
     store: Optional[BaseStore] = None,
     debug: bool = False,
+    enable_thinking: bool = False,
 ) -> Any:
     """
     Create a deep research agent with planning and subagent capabilities.
@@ -146,6 +158,9 @@ def create_research_agent(
               When provided, enables /memories/ path for long-term storage.
         debug: If True, enables debug mode with detailed execution logs.
               Uses DeepAgents built-in debug streaming.
+        enable_thinking: If True, enables thinking mode for supported models
+                        (e.g., DeepSeek-v3, kimi-k2-thinking via DashScope).
+                        The model will show its reasoning process.
 
     Returns:
         Configured DeepAgent instance with subagents.
@@ -186,7 +201,7 @@ def create_research_agent(
         main_tools.extend(hn_main_tools)
 
     # Get model configuration
-    model_config = _get_model_config(model_provider, model_name)
+    model_config = _get_model_config(model_provider, model_name, enable_thinking)
 
     # Load the system prompt from template
     if system_prompt is None:
@@ -224,6 +239,7 @@ def run_research(
     model_name: Optional[str] = None,
     agent: Optional[Any] = None,
     thread_id: Optional[str] = None,
+    enable_thinking: bool = False,
 ) -> str:
     """
     Run a research query using the deep research agent.
@@ -246,6 +262,7 @@ def run_research(
               If None, a new agent will be created.
         thread_id: Unique thread identifier for multi-turn conversations.
                   Required when using checkpointer for state persistence.
+        enable_thinking: If True, enables thinking mode for supported models.
 
     Returns:
         The agent's final response as a string.
@@ -255,6 +272,7 @@ def run_research(
             hn_mcp_tools=hn_mcp_tools,
             model_provider=model_provider,
             model_name=model_name,
+            enable_thinking=enable_thinking,
         )
 
     # Build config with thread_id for multi-turn support
@@ -280,6 +298,7 @@ async def run_research_async(
     model_name: Optional[str] = None,
     agent: Optional[Any] = None,
     thread_id: Optional[str] = None,
+    enable_thinking: bool = False,
 ) -> str:
     """
     Run a research query asynchronously using the deep research agent.
@@ -295,6 +314,7 @@ async def run_research_async(
               If None, a new agent will be created.
         thread_id: Unique thread identifier for multi-turn conversations.
                   Required when using checkpointer for state persistence.
+        enable_thinking: If True, enables thinking mode for supported models.
 
     Returns:
         The agent's final response as a string.
@@ -304,6 +324,7 @@ async def run_research_async(
             hn_mcp_tools=hn_mcp_tools,
             model_provider=model_provider,
             model_name=model_name,
+            enable_thinking=enable_thinking,
         )
 
     # Build config with thread_id for multi-turn support
@@ -319,3 +340,50 @@ async def run_research_async(
     if hasattr(final_message, "content"):
         return final_message.content
     return str(final_message)
+
+
+async def run_research_stream(
+    query: str,
+    agent: Any,
+    thread_id: Optional[str] = None,
+) -> AsyncGenerator[tuple[str, Any], None]:
+    """
+    Stream research query execution with token-level streaming.
+
+    This function uses LangGraph's streaming API with mixed mode to yield:
+    - "updates": Node completion events (tool calls, tool results)
+    - "messages": Token-level LLM output chunks for real-time display
+
+    Args:
+        query: The research question or topic to investigate.
+        agent: Pre-created agent instance (required).
+        thread_id: Unique thread identifier for multi-turn conversations.
+
+    Yields:
+        Tuple of (mode, chunk) where:
+        - mode: "updates" or "messages"
+        - chunk: For "updates", dict with {node_name: {messages: [...]}}
+                 For "messages", tuple of (message_chunk, metadata)
+
+    Example:
+        >>> async for mode, chunk in run_research_stream(query, agent, thread_id):
+        ...     if mode == "updates":
+        ...         # Handle node updates (tool calls, results)
+        ...         pass
+        ...     elif mode == "messages":
+        ...         # Handle token-level streaming
+        ...         message_chunk, metadata = chunk
+        ...         print(message_chunk.content, end="", flush=True)
+    """
+    # Build config with thread_id for multi-turn support
+    config = {}
+    if thread_id:
+        config = {"configurable": {"thread_id": thread_id}}
+
+    # Use mixed mode: "updates" for tool calls, "messages" for token streaming
+    async for mode, chunk in agent.astream(
+        {"messages": [{"role": "user", "content": query}]},
+        config=config if config else None,
+        stream_mode=["updates", "messages"],
+    ):
+        yield (mode, chunk)
