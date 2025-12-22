@@ -73,11 +73,11 @@ def resolve_enable_thinking(
     """
     Resolve thinking mode toggle from an override or environment.
 
-    override=True has highest priority; when override is False/None,
-    env ENABLE_THINKING is considered; otherwise defaults to False.
+    Any non-None override has highest priority; otherwise
+    env ENABLE_THINKING is considered; fallback is False.
     """
-    if override is True:
-        return True
+    if override is not None:
+        return override
 
     env_val = env.get("ENABLE_THINKING")
     if env_val is not None:

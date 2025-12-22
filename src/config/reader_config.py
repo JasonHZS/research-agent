@@ -6,8 +6,8 @@ allowing selection between different web content reading tools.
 
 Selection can be controlled at runtime via the CONTENT_READER_TYPE
 environment variable:
-- "jina" (default): free Jina Reader
-- "zyte": Zyte API (paid)
+- "zyte" (default): Zyte API (paid)
+- "jina": free Jina Reader
 """
 
 import os
@@ -22,7 +22,7 @@ class ReaderType(str, Enum):
 
 
 # Default reader if none specified via environment
-DEFAULT_READER_TYPE: ReaderType = ReaderType.JINA
+DEFAULT_READER_TYPE: ReaderType = ReaderType.ZYTE
 
 
 def get_reader_type() -> ReaderType:

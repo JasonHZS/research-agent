@@ -79,7 +79,7 @@ def _get_reader_tool():
     if reader_type == ReaderType.ZYTE:
         return get_zyte_reader_tool
     else:
-        # Default to Jina Reader
+        # Fallback to Jina Reader
         return get_jina_reader_tool
 
 

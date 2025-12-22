@@ -33,6 +33,7 @@ from src.agent.subagents import (
     get_main_agent_tools,
 )
 from src.config.llm_config import get_model_settings
+from src.config.reader_config import get_reader_type
 from src.prompts import load_prompt
 from src.tools.arxiv_api import get_arxiv_paper_tool, search_arxiv_papers_tool
 from src.tools.hf_blog import get_huggingface_blog_posts_tool
@@ -50,7 +51,7 @@ DEFAULT_ALIYUN_MODEL = "qwen-max"
 
 
 def _get_model_config(
-    model_provider: str = "anthropic",
+    model_provider: str = "aliyun",
     model_name: Optional[str] = None,
     enable_thinking: bool = False,
 ) -> dict[str, Any]:
@@ -131,7 +132,7 @@ def create_research_agent(
     - Main Agent: Coordinator with search/discovery tools
         - Tools: HF papers list, ArXiv search/paper (native), HN stories
     - Content Reader Sub-agent: Deep reading and summarization
-        - Tools: Jina Reader (for URL content)
+        - Tools: Configurable reader (default Zyte, switchable via CONTENT_READER_TYPE)
 
     This separation ensures:
     1. Main agent's context stays clean (only summaries, not raw content)
@@ -222,9 +223,13 @@ def create_research_agent(
     # Get model configuration
     model_config = _get_model_config(resolved_provider, resolved_model_name, resolved_enable_thinking)
 
-    # Load the system prompt from template
+    # Load the system prompt from template with reader type
     if system_prompt is None:
-        system_prompt = load_prompt(prompt_template)
+        reader_type = get_reader_type()
+        system_prompt = load_prompt(
+            prompt_template,
+            reader_type=reader_type.value,
+        )
 
     # Configure backend for persistent file storage
     # When store is provided, use CompositeBackend to route /memories/ to StoreBackend
