@@ -27,6 +27,7 @@ from src.agent.research_agent import (
     run_research_async,
     run_research_stream,
 )
+from src.config.llm_config import get_model_settings
 from src.config.mcp_config import get_single_server_config
 from src.utils.stream_display import StreamDisplay
 
@@ -135,7 +136,7 @@ def _create_session_agent(
 
 async def main(
     query: Optional[str] = None,
-    model_provider: str = "aliyun",
+    model_provider: Optional[str] = None,
     model_name: Optional[str] = None,
     verbose: bool = False,
     enable_thinking: bool = False,
@@ -151,34 +152,51 @@ async def main(
 
     Args:
         query: Research query to execute. If None, runs in interactive mode.
-        model_provider: LLM provider ('aliyun', 'anthropic', or 'openai').
-        model_name: Specific model name (e.g., 'qwen-max', 'kimi-k2-thinking').
+        model_provider: LLM provider ('aliyun', 'anthropic', or 'openai'). Resolved from
+                       CLI > env MODEL_PROVIDER > default ('aliyun').
+        model_name: Specific model name (e.g., 'qwen-max', 'kimi-k2-thinking'). Resolved
+                    from CLI > env MODEL_NAME > provider defaults.
         verbose: If True, prints detailed execution logs including tool calls.
         enable_thinking: If True, enables thinking mode for supported models
                         (e.g., DeepSeek-v3, kimi-k2-thinking via DashScope).
+                        Resolved from CLI > env ENABLE_THINKING > default (False).
     """
     # Load environment variables
     load_dotenv()
 
+    # Resolve model settings with precedence CLI > env > defaults
+    try:
+        model_settings = get_model_settings(
+            provider_override=model_provider,
+            model_name_override=model_name,
+            enable_thinking_override=enable_thinking,
+        )
+    except ValueError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+    resolved_provider = model_settings["provider"]
+    resolved_model_name = model_settings["model_name"]
+    resolved_enable_thinking = model_settings["enable_thinking"]
+
     # Check for required API keys based on provider
-    if model_provider == "aliyun":
+    if resolved_provider == "aliyun":
         if not (os.getenv("ALIYUN_API_KEY") or os.getenv("DASHSCOPE_API_KEY")):
             print("Error: ALIYUN_API_KEY or DASHSCOPE_API_KEY environment variable not set")
             print("Please set it in your .env file or environment")
             sys.exit(1)
-    elif model_provider == "anthropic" and not os.getenv("ANTHROPIC_API_KEY"):
+    elif resolved_provider == "anthropic" and not os.getenv("ANTHROPIC_API_KEY"):
         print("Error: ANTHROPIC_API_KEY environment variable not set")
         print("Please set it in your .env file or environment")
         sys.exit(1)
-    elif model_provider == "openai" and not os.getenv("OPENAI_API_KEY"):
+    elif resolved_provider == "openai" and not os.getenv("OPENAI_API_KEY"):
         print("Error: OPENAI_API_KEY environment variable not set")
         print("Please set it in your .env file or environment")
         sys.exit(1)
 
     print("=" * 60)
     print("Research Agent - Powered by DeepAgents")
-    thinking_str = " | Thinking: ON" if enable_thinking else ""
-    print(f"Provider: {model_provider} | Model: {model_name or 'default'}{thinking_str}")
+    thinking_str = " | Thinking: ON" if resolved_enable_thinking else ""
+    print(f"Provider: {resolved_provider} | Model: {resolved_model_name or 'default'}{thinking_str}")
     print("=" * 60)
 
     # Initialize MCP tools (per server)
@@ -196,12 +214,12 @@ async def main(
     # Pass debug=verbose to enable DeepAgents built-in debug mode
     agent = _create_session_agent(
         mcp_ctx=mcp_ctx,
-        model_provider=model_provider,
-        model_name=model_name,
+        model_provider=resolved_provider,
+        model_name=resolved_model_name,
         checkpointer=checkpointer,
         store=store,
         debug=verbose,
-        enable_thinking=enable_thinking,
+        enable_thinking=resolved_enable_thinking,
     )
 
     try:
@@ -213,7 +231,7 @@ async def main(
                 query=query,
                 agent=agent,
                 thread_id=thread_id,
-                enable_thinking=enable_thinking,
+                enable_thinking=resolved_enable_thinking,
             )
             print("\n" + result)
         else:
@@ -282,15 +300,15 @@ def run_cli() -> None:
     parser.add_argument(
         "-p", "--model-provider",
         type=str,
-        default="aliyun",
+        default=None,
         choices=["aliyun", "anthropic", "openai"],
-        help="LLM provider to use (default: aliyun)",
+        help="LLM provider to use (default: env MODEL_PROVIDER or 'aliyun')",
     )
     parser.add_argument(
-        "-m", "--model-name",
+        "--model",
         type=str,
         default=None,
-        help="Model name to use (e.g., 'qwen-max', 'kimi-k2-thinking' for aliyun)",
+        help="Model name to use (default: env MODEL_NAME or provider default; e.g., 'qwen-max', 'kimi-k2-thinking', 'deepseek-v3.2' for aliyun)",
     )
     parser.add_argument(
         "-v", "--verbose",
@@ -300,7 +318,7 @@ def run_cli() -> None:
     parser.add_argument(
         "--enable-thinking",
         action="store_true",
-        help="Enable thinking mode for supported models (e.g., DeepSeek-v3, kimi-k2-thinking)",
+        help="Enable thinking mode for supported models (CLI overrides env ENABLE_THINKING)",
     )
     args = parser.parse_args()
 
@@ -308,7 +326,7 @@ def run_cli() -> None:
         main(
             query=args.query,
             model_provider=args.model_provider,
-            model_name=args.model_name,
+            model_name=args.model,
             verbose=args.verbose,
             enable_thinking=args.enable_thinking,
         )
@@ -317,4 +335,3 @@ def run_cli() -> None:
 
 if __name__ == "__main__":
     run_cli()
-

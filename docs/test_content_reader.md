@@ -42,7 +42,7 @@ python scripts/test_content_reader.py --url "https://example.com" -p anthropic
 python scripts/test_content_reader.py --url "https://example.com" -p openai
 
 # Use specific model
-python scripts/test_content_reader.py --url "https://example.com" -m kimi-k2-thinking
+python scripts/test_content_reader.py --url "https://example.com" --model kimi-k2-thinking
 ```
 
 ### 5. Verbose Mode (See Tool Calls)

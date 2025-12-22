@@ -30,7 +30,7 @@ python -m src.main --query "What are the latest LLM papers?"
 # Use different providers
 python -m src.main -p anthropic  # Use Claude
 python -m src.main -p openai     # Use GPT
-python -m src.main -m kimi-k2-thinking  # Use Kimi model
+python -m src.main --model kimi-k2-thinking  # Use Kimi model
 
 # Verbose mode (shows tool calls and agent steps)
 python -m src.main -v

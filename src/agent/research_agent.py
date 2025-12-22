@@ -32,15 +32,18 @@ from src.agent.subagents import (
     create_content_reader_subagent,
     get_main_agent_tools,
 )
+from src.config.llm_config import get_model_settings
 from src.prompts import load_prompt
 from src.tools.arxiv_api import get_arxiv_paper_tool, search_arxiv_papers_tool
 from src.tools.hf_blog import get_huggingface_blog_posts_tool
 from src.tools.hf_daily_papers import get_huggingface_papers_tool
+from src.tools.zyte_reader import get_zyte_article_list_tool
 
 # Available models on Aliyun DashScope
 ALIYUN_MODELS = {
     "qwen-max": "qwen-max",
     "kimi-k2-thinking": "kimi-k2-thinking",
+    "deepseek-v3.2": "deepseek-v3.2",
 }
 
 DEFAULT_ALIYUN_MODEL = "qwen-max"
@@ -112,7 +115,7 @@ def _get_model_config(
 
 def create_research_agent(
     hn_mcp_tools: Optional[list] = None,
-    model_provider: str = "anthropic",
+    model_provider: Optional[str] = None,
     model_name: Optional[str] = None,
     system_prompt: Optional[str] = None,
     prompt_template: str = "research_agent",
@@ -147,7 +150,8 @@ def create_research_agent(
     Args:
         hn_mcp_tools: Hacker News MCP tools (will be split between main/sub agent).
         model_provider: LLM provider ('anthropic', 'openai', or 'aliyun').
-        model_name: Specific model to use.
+                        Resolved via CLI/env/defaults using llm_config when not set.
+        model_name: Specific model to use. Resolved via CLI/env/defaults when not set.
         system_prompt: Custom system prompt. If provided, overrides prompt_template.
         prompt_template: Name of the prompt template to use (without .md extension).
                         Defaults to 'research_agent'. Edit the template file directly
@@ -187,12 +191,13 @@ def create_research_agent(
     subagents = [content_reader]
 
     # Build main agent tools: Discovery/Search tools + ArXiv tools
-    # Main agent gets: HF papers list + ArXiv tools (native) + HN discovery tools
+    # Main agent gets: HF papers list + ArXiv tools (native) + HN discovery tools + Blog article list
     main_tools = [
         get_huggingface_papers_tool,
         get_huggingface_blog_posts_tool,
         get_arxiv_paper_tool,
         search_arxiv_papers_tool,
+        get_zyte_article_list_tool,  # Fetch article list from any blog/news site
     ]
 
     # Add discovery tools from HN MCP (getTopStories, getBestStories, etc.)
@@ -200,8 +205,22 @@ def create_research_agent(
     if hn_main_tools:
         main_tools.extend(hn_main_tools)
 
+    # Resolve model settings (CLI > env > defaults)
+    try:
+        model_settings = get_model_settings(
+            provider_override=model_provider,
+            model_name_override=model_name,
+            enable_thinking_override=enable_thinking,
+        )
+    except ValueError as e:
+        raise ValueError(f"Invalid model configuration: {e}") from e
+
+    resolved_provider = model_settings["provider"]
+    resolved_model_name = model_settings["model_name"]
+    resolved_enable_thinking = model_settings["enable_thinking"]
+
     # Get model configuration
-    model_config = _get_model_config(model_provider, model_name, enable_thinking)
+    model_config = _get_model_config(resolved_provider, resolved_model_name, resolved_enable_thinking)
 
     # Load the system prompt from template
     if system_prompt is None:
@@ -235,7 +254,7 @@ def create_research_agent(
 def run_research(
     query: str,
     hn_mcp_tools: Optional[list] = None,
-    model_provider: str = "anthropic",
+    model_provider: Optional[str] = None,
     model_name: Optional[str] = None,
     agent: Optional[Any] = None,
     thread_id: Optional[str] = None,
@@ -257,7 +276,8 @@ def run_research(
         query: The research question or topic to investigate.
         hn_mcp_tools: Hacker News MCP tools for web content.
         model_provider: LLM provider to use ('anthropic', 'openai', or 'aliyun').
-        model_name: Specific model name.
+                        Resolved via CLI/env/defaults when not set.
+        model_name: Specific model name. Resolved via CLI/env/defaults when not set.
         agent: Pre-created agent instance (for multi-turn conversations).
               If None, a new agent will be created.
         thread_id: Unique thread identifier for multi-turn conversations.
@@ -294,7 +314,7 @@ def run_research(
 async def run_research_async(
     query: str,
     hn_mcp_tools: Optional[list] = None,
-    model_provider: str = "anthropic",
+    model_provider: Optional[str] = None,
     model_name: Optional[str] = None,
     agent: Optional[Any] = None,
     thread_id: Optional[str] = None,
@@ -309,7 +329,8 @@ async def run_research_async(
         query: The research question or topic to investigate.
         hn_mcp_tools: Hacker News MCP tools for web content.
         model_provider: LLM provider to use ('anthropic', 'openai', or 'aliyun').
-        model_name: Specific model name.
+                        Resolved via CLI/env/defaults when not set.
+        model_name: Specific model name. Resolved via CLI/env/defaults when not set.
         agent: Pre-created agent instance (for multi-turn conversations).
               If None, a new agent will be created.
         thread_id: Unique thread identifier for multi-turn conversations.

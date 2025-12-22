@@ -23,7 +23,8 @@ src/
 │       └── content_reader_agent.py  # Sub-agent for content reading
 ├── config/
 │   ├── __init__.py
-│   └── mcp_config.py             # MCP server configurations
+│   ├── mcp_config.py             # MCP server configurations
+│   └── reader_config.py          # Content reader tool configuration
 ├── prompts/
 │   ├── loader.py                 # Jinja2 template loader
 │   └── templates/                # Markdown prompt templates
@@ -32,7 +33,8 @@ src/
 │   ├── arxiv_api.py              # ArXiv API search and fetch tools
 │   ├── hf_blog.py                # Hugging Face blog listing tool
 │   ├── hf_daily_papers.py        # Hugging Face daily papers tool
-│   └── jina_reader.py            # Jina AI web reader tool
+│   ├── jina_reader.py            # Jina AI web reader tool
+│   └── zyte_reader.py            # Zyte API article extraction tool
 └── main.py                       # CLI entry point
 ```
 
@@ -110,11 +112,11 @@ JINA_API_KEY=your-jina-api-key
 uv run python -m src.main
 
 # Use kimi-k2-thinking model
-uv run python -m src.main -m kimi-k2-thinking
+uv run python -m src.main --model kimi-k2-thinking
 
 # Enable thinking mode (shows model's reasoning process)
 uv run python -m src.main --enable-thinking
-uv run python -m src.main -m kimi-k2-thinking --enable-thinking
+uv run python -m src.main --model kimi-k2-thinking --enable-thinking
 
 # Use Anthropic or OpenAI instead
 uv run python -m src.main -p anthropic
@@ -197,6 +199,21 @@ print(f"Authors: {', '.join(paper['authors'][:3])}")
 | `get_huggingface_papers_tool` | Fetches daily papers from Hugging Face with titles and abstracts |
 | `get_huggingface_blog_posts_tool` | Lists Hugging Face blog posts with title, date, upvotes, and URL |
 | `get_jina_reader_tool` | Reads and extracts content from web URLs as markdown |
+| `get_zyte_reader_tool` | Extracts structured article content via Zyte API |
+
+### Content Reader Configuration
+
+The Content Reader agent supports two reader tools. Configure in `src/config/reader_config.py`:
+
+```python
+# Options: ReaderType.JINA or ReaderType.ZYTE
+READER_TYPE: ReaderType = ReaderType.ZYTE
+```
+
+| Reader | Description | Cost |
+|--------|-------------|------|
+| Jina | Converts web pages to markdown | Free |
+| Zyte | Extracts structured article content (title, author, body) | Paid |
 
 ### MCP Tools (via external servers)
 
