@@ -28,6 +28,14 @@ from src.tools.bocha_search import (
     bocha_web_search_tool,
     search_web,
 )
+from src.tools.github_search import (
+    github_search_tool,
+    github_readme_tool,
+    search_github_repos,
+    search_github_issues,
+    search_github_commits,
+    get_github_readme,
+)
 
 __all__ = [
     "fetch_arxiv_paper",
@@ -46,4 +54,10 @@ __all__ = [
     "get_zyte_article_list_tool",
     "bocha_web_search_tool",
     "search_web",
+    "github_search_tool",
+    "github_readme_tool",
+    "search_github_repos",
+    "search_github_issues",
+    "search_github_commits",
+    "get_github_readme",
 ]
