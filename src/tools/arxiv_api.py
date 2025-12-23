@@ -281,7 +281,7 @@ def get_arxiv_paper_tool(arxiv_id: str) -> str:
     Fetch detailed metadata for a specific ArXiv paper.
 
     Use this tool when you need to get the full details of an ArXiv paper
-    including its title, authors, abstract, categories, and links.
+    including its abstract, categories, and links.
 
     Args:
         arxiv_id: The ArXiv paper ID (e.g., "2402.02716" or "2402.02716v1").
@@ -350,8 +350,8 @@ def search_arxiv_papers_tool(
     """
     Search for papers on ArXiv.
 
-    Use this tool to find research papers on ArXiv matching your search query.
-    Supports ArXiv's search syntax for field-specific searches.
+    Use this tool to find research papers matching your search query.
+    Supports field-specific searches (see query parameter for syntax).
     """
     try:
         papers = search_arxiv(

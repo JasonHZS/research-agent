@@ -15,15 +15,10 @@
 获取 Hugging Face 博客文章列表，包含每篇文章的标题、发布日期、点赞数、URL。支持分页参数（`page_start`/`max_pages`）与数量限制（`limit`）。
 
 ### `search_arxiv_papers_tool`
-搜索 ArXiv 论文库。支持查询语法：
-- 简单搜索：`"LLM agents"`
-- 标题搜索：`"ti:transformer"`
-- 作者搜索：`"au:hinton"`
-- 分类搜索：`"cat:cs.AI"`
-- 组合搜索：`"all:LLM AND cat:cs.CL"`
+搜索 ArXiv 论文库的元数据，支持字段搜索和组合查询语法。
 
 ### `get_arxiv_paper_tool`
-获取指定 ArXiv ID 的论文详细信息，包括标题、作者、摘要、分类、PDF 链接等。
+获取指定 ArXiv ID 的论文详细信息，包括标题、作者、**摘要**、分类、PDF 链接等。
 
 ### Hacker News Tools
 获取 Hacker News 热门故事和讨论列表，用户没指定的时候，默认只获取 top10 的 story。
@@ -31,9 +26,9 @@
 ### `get_zyte_article_list_tool`
 获取任意博客或新闻网站的文章列表，返回标题、URL、发布日期等。适用于发现 LangChain、OpenAI、Google 等公司官方博客的最新文章。
 
-### `github_search_tool` & `github_readme_tool`
-搜索 GitHub 开源项目和阅读项目文档。适用于查找论文对应的代码实现、技术方案的开源替代品。
-- 典型流程：先用 `github_search_tool` 搜索仓库，再用 `github_readme_tool` 阅读感兴趣项目的 README
+### `github_search_tool`
+搜索 GitHub 开源项目。适用于查找论文对应的代码实现、技术方案的开源替代品。
+- 支持搜索仓库、Issues、Commits
 - **注意**：未认证 API 每分钟仅 10 次请求，请谨慎使用
 
 ### `bocha_web_search_tool`（优先级最低）
@@ -57,14 +52,17 @@
 {% else %}
 - 使用 `get_zyte_reader_tool` 提取网页的结构化内容并阅读
 {% endif %}
+- 使用 `github_readme_tool` 阅读 GitHub 仓库的 README 文档
 - 按专业格式输出结构化总结
 
 调用方式：
-- **必须（MUST）传入具体的 URL（网页地址）**
+- **必须（MUST）传入具体的 URL（网页地址）或 GitHub 仓库全名（如 `owner/repo`）**
 - 可指定关注的特定问题或角度
 - 返回结构化的总结（而非原始全文）
 
 **注意**：ArXiv 论文的元数据（标题、摘要等）请直接使用 `get_arxiv_paper_tool` 获取，无需委派给 subagent。
+
+**典型流程**：先用 `github_search_tool` 搜索感兴趣的仓库，再委派给 `content-reader-agent` 阅读项目的 README。
 
 ## 研究流程
 

@@ -16,6 +16,7 @@ from typing import Any
 
 from src.config.reader_config import ReaderType, get_reader_type
 from src.prompts import load_prompt
+from src.tools.github_search import github_readme_tool
 from src.tools.jina_reader import get_jina_reader_tool
 from src.tools.zyte_reader import get_zyte_reader_tool
 
@@ -104,19 +105,17 @@ def create_content_reader_subagent() -> dict[str, Any]:
         summary_format=summary_format,
     )
 
-    # Build tools list: use configured reader tool
+    # Build tools list: use configured reader tool + GitHub README tool
     reader_tool = _get_reader_tool()
-    tools = [reader_tool]
-
-    # HN reader tools: none bound explicitly (empty set)
+    tools = [reader_tool, github_readme_tool]
 
     return {
         "name": "content-reader-agent",
         "description": (
-            "URL 内容阅读与总结专家。"
-            "当需要深度阅读网页文章、博客、技术文档等 URL 内容时使用此 agent。"
-            "传入 URL，返回结构化的内容总结。"
-            "适用于：阅读技术博客、阅读新闻文章、提取文档要点。"
+            "内容阅读与总结专家。"
+            "当需要深度阅读网页文章、博客、技术文档或 GitHub 仓库 README 时使用此 agent。"
+            "传入 URL 或 GitHub 仓库名（owner/repo），返回结构化的内容总结。"
+            "适用于：阅读技术博客、阅读新闻文章、提取文档要点、了解开源项目。"
         ),
         "system_prompt": system_prompt,
         "tools": tools,
