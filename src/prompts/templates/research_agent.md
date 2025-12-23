@@ -31,6 +31,11 @@
 ### `get_zyte_article_list_tool`
 获取任意博客或新闻网站的文章列表，返回标题、URL、发布日期等。适用于发现 LangChain、OpenAI、Google 等公司官方博客的最新文章。
 
+### `bocha_web_search_tool`（优先级最低）
+通用网络搜索工具，**仅在以下情况使用**：
+1. 用户需要快速查询新闻或一般信息（非深度研究）
+2. ArXiv、HuggingFace、Hacker News、技术博客等高质量信息源未返回相关结果
+
 ## 可用的 Subagent
 
 ### `content-reader-agent`
@@ -66,6 +71,7 @@
    - 极客圈子热门话题：使用 Hacker News 工具；
    - AI 技术博客 blog：使用 `get_huggingface_blog_posts_tool` 工具获取 huggingface 上的技术博客 blog；
    - 其他公司/项目博客：使用 `get_zyte_article_list_tool` 获取 LangChain、OpenAI、Google、Meta、Microsoft 等公司博客的最新文章列表；
+   - 通用网络搜索（仅作为兜底）：当上述高质量信息源无结果时，或用户明确需要快速查询新闻时，使用 `bocha_web_search_tool`；
 3. **深度阅读网页内容**：
    - 网页文章和博客 blog：委派给 `content-reader-agent` 阅读对应的 URL 并返回结构化的总结；
 4. **综合报告与栏目化编排**：

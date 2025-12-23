@@ -24,6 +24,10 @@ from src.tools.zyte_reader import (
     get_zyte_article_list_tool,
     get_zyte_reader_tool,
 )
+from src.tools.bocha_search import (
+    bocha_web_search_tool,
+    search_web,
+)
 
 __all__ = [
     "fetch_arxiv_paper",
@@ -40,4 +44,6 @@ __all__ = [
     "fetch_article_list",
     "get_zyte_reader_tool",
     "get_zyte_article_list_tool",
+    "bocha_web_search_tool",
+    "search_web",
 ]
