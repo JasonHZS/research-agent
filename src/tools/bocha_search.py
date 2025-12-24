@@ -147,22 +147,16 @@ def _handle_request_error(e: requests.RequestException, query: str) -> str:
 
 
 @tool
-def bocha_web_search_tool(query: str, count: int = 10) -> str:
+def bocha_web_search_tool(query: str, count: int = 5) -> str:
     """
-    Perform a general web search (LOW PRIORITY - use as fallback).
+    Perform a general web search using the Bocha Search API.
 
-    This tool should be used ONLY when:
-    1. User needs quick lookup of news or general information (not deep research)
-    2. Higher-quality sources (ArXiv, HuggingFace, Hacker News, tech blogs) 
-       have not returned relevant results
-    3. defult count is 5
-
-    For AI/ML research, prefer: ArXiv papers, HuggingFace daily papers, 
-    tech blog article lists, and Hacker News discussions.
+    This tool searches the web and returns relevant results including titles, URLs,
+    publication dates, and content summaries.
 
     Args:
         query: The search query string. Be specific for better results.
-        count: Number of results to return (1-20, default: 10).
+        count: Number of results to return (1-20, default: 5).
 
     Returns:
         Markdown-formatted list of search results with title, URL, date, and summary.

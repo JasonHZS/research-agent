@@ -8,6 +8,11 @@ Multi-turn Conversation Support:
 - Uses MemorySaver to persist conversation state across turns
 - Uses InMemoryStore for persistent file storage via /memories/ path
 - Each session gets a unique thread_id for conversation tracking
+
+Deep Research Mode:
+- Enable with --deep-research flag
+- Implements "Clarify -> Plan -> Retrieve -> Read -> Reflect" loop
+- Configurable max iterations with --max-iterations
 """
 
 import asyncio
@@ -27,6 +32,11 @@ from src.agent.research_agent import (
     run_research_async,
     run_research_stream,
 )
+from src.deep_research import (
+    DeepResearchState,
+    build_deep_research_graph,
+)
+from src.config.deep_research_config import get_max_iterations
 from src.config.llm_config import get_model_settings
 from src.config.mcp_config import get_single_server_config
 from src.utils.stream_display import StreamDisplay
@@ -70,10 +80,10 @@ async def _load_mcp_server_tools(
         client = MultiServerMCPClient({server_name: config})
         # In langchain-mcp-adapters 0.1.0+, get_tools() handles connection internally
         tools = await client.get_tools()
-        print(f"✓ Loaded {len(tools)} tools from {server_name} MCP server")
-        for tool in tools:
-            desc = tool.description[:50] if tool.description else "No description"
-            print(f"  - {tool.name}: {desc}...")
+        # print(f"✓ Loaded {len(tools)} tools from {server_name} MCP server")
+        # for tool in tools:
+        #     desc = tool.description[:50] if tool.description else "No description"
+        #     print(f"  - {tool.name}: {desc}...")
         return client, tools
     except Exception as e:
         print(f"⚠ Warning: Could not load {server_name} MCP tools: {e}")
@@ -134,12 +144,117 @@ def _create_session_agent(
     )
 
 
+async def main_deep_research(
+    query: str,
+    mcp_ctx: MCPToolsContext,
+    model_provider: str,
+    model_name: Optional[str],
+    max_iterations: int,
+    verbose: bool = False,
+) -> None:
+    """
+    Run deep research mode with human-in-the-loop clarification.
+
+    This implements the "Clarify -> Plan -> Retrieve -> Read -> Reflect" loop.
+
+    Args:
+        query: Research query to execute.
+        mcp_ctx: MCP tools context.
+        model_provider: LLM provider.
+        model_name: Model name.
+        max_iterations: Maximum research iterations.
+        verbose: Enable verbose output.
+    """
+    print("\n🔬 Deep Research Mode")
+    print(f"Max iterations: {max_iterations}")
+    print("-" * 60)
+
+    # Build the deep research graph
+    graph = build_deep_research_graph(
+        hn_mcp_tools=mcp_ctx.hn_tools,
+        model_provider=model_provider,
+        model_name=model_name,
+        max_iterations=max_iterations,
+    )
+
+    # Initialize state
+    state = DeepResearchState(
+        original_query=query,
+        max_iterations=max_iterations,
+    )
+
+    config = {"configurable": {"thread_id": f"deep_research_{uuid.uuid4().hex[:8]}"}}
+
+    # Run with human-in-the-loop for clarification
+    current_state_dict = state.model_dump()
+
+    while True:
+        if verbose:
+            print(f"\n[DEBUG] Running graph with state: clarified={current_state_dict.get('is_clarified')}")
+
+        # Run the graph
+        try:
+            result = await graph.ainvoke(current_state_dict, config)
+        except Exception as e:
+            print(f"\n❌ Error during research: {e}")
+            if verbose:
+                import traceback
+                traceback.print_exc()
+            return
+
+        if verbose:
+            print(f"[DEBUG] Graph result: is_clarified={result.get('is_clarified')}, "
+                  f"pending_question={result.get('pending_question')}, "
+                  f"is_sufficient={result.get('is_sufficient')}")
+
+        # Check if we need clarification
+        if result.get("pending_question") and not result.get("is_clarified"):
+            print(f"\n💬 {result['pending_question']}")
+            print("   (输入 '直接开始' 跳过澄清)")
+
+            try:
+                user_answer = input("\n📝 Your answer: ").strip()
+            except (KeyboardInterrupt, EOFError):
+                print("\n\n已取消研究。")
+                return
+
+            # Check if user wants to skip clarification
+            skip_phrases = ["直接开始", "跳过", "skip", "start", "开始研究", "不用问了"]
+            if any(phrase in user_answer.lower() for phrase in skip_phrases):
+                current_state_dict = result.copy()
+                current_state_dict["is_clarified"] = True
+                current_state_dict["clarified_query"] = current_state_dict["original_query"]
+                current_state_dict["pending_question"] = None
+            else:
+                # Update state with answer and continue
+                current_state_dict = result.copy()
+                current_state_dict["user_answer"] = user_answer
+                current_state_dict["pending_question"] = None
+        else:
+            # Graph completed or clarification done
+            if result.get("final_report"):
+                print("\n" + "=" * 60)
+                print("📊 DEEP RESEARCH REPORT")
+                print("=" * 60 + "\n")
+                print(result["final_report"])
+                print("\n" + "=" * 60)
+
+                # Print iteration stats
+                print(f"\n📈 Statistics:")
+                print(f"   - Iterations: {result.get('iteration_count', 0)}/{max_iterations}")
+                print(f"   - Sources visited: {len(result.get('visited_sources', []))}")
+                print(f"   - Info gathered: {len(result.get('gathered_info', []))} items")
+            break
+
+
 async def main(
     query: Optional[str] = None,
     model_provider: Optional[str] = None,
     model_name: Optional[str] = None,
     verbose: bool = False,
     enable_thinking: bool = False,
+    deep_research: bool = False,
+    max_iterations: Optional[int] = None,
 ) -> None:
     """
     Main function to run the research agent.
@@ -160,6 +275,9 @@ async def main(
         enable_thinking: If True, enables thinking mode for supported models
                         (e.g., DeepSeek-v3, kimi-k2-thinking via DashScope).
                         Resolved from CLI > env ENABLE_THINKING > default (False).
+        deep_research: If True, runs in Deep Research mode with iterative
+                      "Clarify -> Plan -> Retrieve -> Read -> Reflect" loop.
+        max_iterations: Maximum iterations for Deep Research mode (default: 5).
     """
     # Load environment variables
     load_dotenv()
@@ -193,15 +311,48 @@ async def main(
         print("Please set it in your .env file or environment")
         sys.exit(1)
 
+    # Resolve max iterations for deep research
+    resolved_max_iterations = get_max_iterations(max_iterations)
+
     print("=" * 60)
-    print("Research Agent - Powered by DeepAgents")
+    mode_str = "Deep Research Mode" if deep_research else "Research Agent"
+    print(f"{mode_str} - Powered by {'LangGraph' if deep_research else 'DeepAgents'}")
     thinking_str = " | Thinking: ON" if resolved_enable_thinking else ""
-    print(f"Provider: {resolved_provider} | Model: {resolved_model_name or 'default'}{thinking_str}")
+    deep_str = f" | Max Iterations: {resolved_max_iterations}" if deep_research else ""
+    print(f"Provider: {resolved_provider} | Model: {resolved_model_name or 'default'}{thinking_str}{deep_str}")
     print("=" * 60)
 
     # Initialize MCP tools (per server)
     mcp_ctx = await initialize_mcp_tools()
 
+    # Deep Research Mode
+    if deep_research:
+        if not query:
+            # Interactive mode for deep research - get query first
+            print("\n🔬 Deep Research Mode - Enter your research query:")
+            try:
+                query = input("\n📚 Research Query: ").strip()
+                if not query:
+                    print("No query provided. Exiting.")
+                    return
+            except (KeyboardInterrupt, EOFError):
+                print("\n\nGoodbye!")
+                return
+
+        try:
+            await main_deep_research(
+                query=query,
+                mcp_ctx=mcp_ctx,
+                model_provider=resolved_provider,
+                model_name=resolved_model_name,
+                max_iterations=resolved_max_iterations,
+                verbose=verbose,
+            )
+        finally:
+            await mcp_ctx.cleanup()
+        return
+
+    # Standard Research Agent Mode
     # Initialize persistence for multi-turn conversations
     checkpointer = MemorySaver()
     store = InMemoryStore()
@@ -320,6 +471,17 @@ def run_cli() -> None:
         action="store_true",
         help="Enable thinking mode for supported models (CLI overrides env ENABLE_THINKING)",
     )
+    parser.add_argument(
+        "--deep-research",
+        action="store_true",
+        help="Enable Deep Research mode with iterative 'Clarify -> Plan -> Retrieve -> Read -> Reflect' loop",
+    )
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=3,
+        help="Maximum iterations for Deep Research mode (default: env DEEP_RESEARCH_MAX_ITERATIONS or 5)",
+    )
     args = parser.parse_args()
 
     asyncio.run(
@@ -329,6 +491,8 @@ def run_cli() -> None:
             model_name=args.model,
             verbose=args.verbose,
             enable_thinking=args.enable_thinking,
+            deep_research=args.deep_research,
+            max_iterations=args.max_iterations,
         )
     )
 
