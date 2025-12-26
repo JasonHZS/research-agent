@@ -4,6 +4,7 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 
 ## Features
 
+- **Deep Research Mode**: Section-based parallel research with intent clarification, review loops, and structured report generation
 - **ArXiv Search**: Search and retrieve academic papers using ArXiv's official API
 - **Hacker News Integration**: Get trending stories and discussions via MCP
 - **Hugging Face Daily Papers**: Fetch daily featured AI/ML papers with titles and abstracts
@@ -12,30 +13,98 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 - **Thinking Mode**: Optional thinking mode for supported models (qwen-max, DeepSeek-v3.2, kimi-k2-thinking)
 - **Modular Architecture**: High cohesion, low coupling design for easy extension
 
+## Two Research Modes
+
+| Feature | Normal Mode | Deep Research Mode |
+|---------|-------------|-------------------|
+| Execution | Single-turn ReAct | Multi-turn state machine |
+| Intent Clarification | None | Supported (skippable) |
+| Research Planning | Implicit | Explicit section generation |
+| Parallel Execution | None | Section-based parallel research |
+| Review Mechanism | None | Review node evaluates evidence sufficiency |
+| Context Management | Accumulates all messages | Researcher-level compression |
+| Use Case | Simple queries, quick lookups | In-depth research, comprehensive reports |
+
 ## Architecture
 
 ```
 src/
 ├── agent/
-│   ├── __init__.py
-│   ├── research_agent.py         # Main agent implementation with LangGraph
+│   ├── research_agent.py         # Normal mode agent with LangGraph
 │   └── subagents/
 │       └── content_reader_agent.py  # Sub-agent for content reading
+├── deep_research/                # Deep Research Mode (Section-based)
+│   ├── graph.py                  # Main graph construction
+│   ├── state.py                  # State definitions (Section, AgentState, etc.)
+│   ├── structured_outputs.py     # Pydantic models for structured LLM outputs
+│   ├── nodes/                    # Graph nodes
+│   │   ├── clarify.py            # Intent clarification node
+│   │   ├── brief.py              # Section planning node
+│   │   ├── researcher.py         # Researcher subgraph (parallel execution)
+│   │   ├── review.py             # Evidence review node
+│   │   └── report.py             # Final report generation node
+│   └── utils/                    # Utilities (compression, LLM, tools, state)
 ├── config/
-│   ├── __init__.py
 │   ├── mcp_config.py             # MCP server configurations
+│   ├── deep_research_config.py   # Deep Research configuration
 │   └── reader_config.py          # Content reader tool configuration
 ├── prompts/
 │   ├── loader.py                 # Jinja2 template loader
 │   └── templates/                # Markdown prompt templates
 ├── tools/
-│   ├── __init__.py
 │   ├── arxiv_api.py              # ArXiv API search and fetch tools
 │   ├── hf_blog.py                # Hugging Face blog listing tool
 │   ├── hf_daily_papers.py        # Hugging Face daily papers tool
 │   ├── jina_reader.py            # Jina AI web reader tool
 │   └── zyte_reader.py            # Zyte API article extraction tool
 └── main.py                       # CLI entry point
+```
+
+### Deep Research Graph Flow
+
+```mermaid
+graph TB
+    subgraph entry [Entry]
+        Start([用户查询])
+    end
+
+    subgraph clarify_loop [意图澄清]
+        Clarify[Clarify Node]
+        UserInput([用户回答])
+        Clarify -->|需要澄清| UserInput
+        UserInput --> Clarify
+    end
+
+    subgraph parallel [并行研究]
+        Plan[Plan Sections Node]
+        R1[Researcher 1]
+        R2[Researcher 2]
+        RN[Researcher N]
+        Aggregate[Aggregate Node]
+
+        Plan -->|Command + Send| R1
+        Plan -->|Command + Send| R2
+        Plan -->|Command + Send| RN
+        R1 --> Aggregate
+        R2 --> Aggregate
+        RN --> Aggregate
+    end
+
+    subgraph review_loop [评估闭环]
+        Review[Review Node]
+        Review -->|章节不足| Plan
+    end
+
+    subgraph output [Output]
+        Report[Final Report Node]
+        Final([研究报告])
+    end
+
+    Start --> Clarify
+    Clarify -->|Command| Plan
+    Aggregate --> Review
+    Review -->|证据充足| Report
+    Report --> Final
 ```
 
 ## Prerequisites
@@ -132,7 +201,42 @@ uv run python -m src.main -q "帮我深度总结一下 hacker news 和 huggingfa
 uv run python -m src.main -q "分析最新的 LLM 论文趋势" --enable-thinking -v
 ```
 
+### Deep Research Mode
+
+Deep Research Mode uses a section-based parallel architecture for comprehensive research tasks. It includes intent clarification, structured section planning, parallel research execution, and iterative review.
+
+```bash
+# Interactive mode
+uv run python -m src.main --deep-research
+
+# With a query
+uv run python -m src.main --deep-research -q "RAG 技术的最新进展有哪些？"
+
+# Custom review iterations (default: 2)
+uv run python -m src.main --deep-research --max-iterations 3 -q "对比 Llama 3 和 GPT-4 的技术架构"
+
+# With verbose logging
+uv run python -m src.main --deep-research -v
+
+# Specify LLM provider
+uv run python -m src.main --deep-research -p anthropic -q "Transformer 的注意力机制演进"
+
+# Use a specific model
+uv run python -m src.main --deep-research --model kimi-k2-thinking -q "LLM 推理优化技术"
+```
+
+**Deep Research Flow:**
+1. **Clarify** - Asks clarifying questions if the query is ambiguous (can be skipped)
+2. **Plan Sections** - Generates 3-7 independent research sections
+3. **Parallel Research** - Each section is researched in parallel using available tools
+4. **Review** - Evaluates evidence sufficiency across all sections
+5. **Iterate or Report** - If gaps exist, re-research specific sections; otherwise generate final report
+
+For detailed architecture documentation, see [`src/deep_research/README.md`](src/deep_research/README.md).
+
 ### Programmatic Usage
+
+#### Normal Mode
 
 ```python
 import asyncio
@@ -145,7 +249,7 @@ async def main():
     mcp_config = get_mcp_config()
     async with MultiServerMCPClient(mcp_config) as client:
         tools = await client.get_tools()
-        
+
         # Run research with Aliyun (default)
         result = await run_research(
             query="Summarize today's Hugging Face papers on transformers",
@@ -159,33 +263,45 @@ async def main():
 asyncio.run(main())
 ```
 
-### Using Individual Tools
+#### Deep Research Mode
 
 ```python
-from src.tools.hf_daily_papers import fetch_huggingface_daily_papers
-from src.tools.hf_blog import fetch_huggingface_blog_posts
-from src.tools.arxiv_api import search_arxiv, fetch_arxiv_paper
+import asyncio
+from src.deep_research import build_deep_research_graph, run_deep_research
 
-# Fetch Hugging Face daily papers for a specific date
-papers = fetch_huggingface_daily_papers("2025-12-15")
-for paper in papers:
-    print(f"Title: {paper['title']}")
-    print(f"Abstract: {paper['abstract'][:200]}...")
+async def main():
+    # Build the deep research graph
+    graph = build_deep_research_graph(
+        hn_mcp_tools=None,  # Optional HN MCP tools
+        model_provider="aliyun",
+        model_name="qwen-max",
+    )
 
-# Fetch Hugging Face blog posts
-blog_posts = fetch_huggingface_blog_posts(limit=10)
-for post in blog_posts:
-    print(f"{post['title']} - {post['date']} ({post['upvotes']} upvotes)")
+    # Define clarification callback (optional)
+    async def on_clarify(question: str) -> str:
+        return input(f"Agent asks: {question}\nYour answer: ")
 
-# Search ArXiv papers
-results = search_arxiv("LLM agents", max_results=5, sort_by="submittedDate")
-for paper in results:
-    print(f"{paper['title']} [{paper['arxiv_id']}]")
+    # Configuration
+    config = {
+        "configurable": {
+            "thread_id": "research-session-1",
+            "max_tool_calls_per_researcher": 10,
+            "max_review_iterations": 2,
+            "model_provider": "aliyun",
+            "model_name": "qwen-max",
+        }
+    }
 
-# Fetch a specific ArXiv paper
-paper = fetch_arxiv_paper("2402.02716")
-print(f"Title: {paper['title']}")
-print(f"Authors: {', '.join(paper['authors'][:3])}")
+    # Run deep research
+    report = await run_deep_research(
+        query="LLM 推理优化的最新技术",
+        graph=graph,
+        config=config,
+        on_clarify_question=on_clarify,
+    )
+    print(report)
+
+asyncio.run(main())
 ```
 
 ## Available Tools
@@ -223,15 +339,28 @@ READER_TYPE: ReaderType = ReaderType.ZYTE
 
 ## Example Queries
 
+### Normal Mode (Quick Research)
+
 ```
 📚 "What are the top papers on Hugging Face today about vision-language models?"
 
 📚 "Search ArXiv for recent papers on reinforcement learning from human feedback"
 
 📚 "What's trending on Hacker News about AI startups?"
+```
 
-📚 "Give me a comprehensive report on the latest advances in multimodal AI, 
+### Deep Research Mode (Comprehensive Reports)
+
+```
+📖 "RAG 技术的最新进展有哪些？" (What are the latest advances in RAG?)
+
+📖 "对比 Llama 3 和 GPT-4 的技术架构" (Compare Llama 3 and GPT-4 architecture)
+
+📖 "Give me a comprehensive report on the latest advances in multimodal AI,
     including papers from ArXiv and Hugging Face, and relevant HN discussions"
+
+📖 "Analyze the evolution of attention mechanisms in Transformers,
+    covering sparse attention, linear attention, and recent innovations"
 ```
 
 ## Development

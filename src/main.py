@@ -9,10 +9,11 @@ Multi-turn Conversation Support:
 - Uses InMemoryStore for persistent file storage via /memories/ path
 - Each session gets a unique thread_id for conversation tracking
 
-Deep Research Mode:
+Deep Research Mode (Supervisor-Researcher Architecture):
 - Enable with --deep-research flag
-- Implements "Clarify -> Plan -> Retrieve -> Read -> Reflect" loop
-- Configurable max iterations with --max-iterations
+- Implements supervisor-researcher multi-agent architecture
+- Supervisor plans and delegates, researchers execute in parallel
+- Configurable max iterations and concurrency
 """
 
 import asyncio
@@ -32,11 +33,13 @@ from src.agent.research_agent import (
     run_research_async,
     run_research_stream,
 )
-from src.deep_research import (
-    DeepResearchState,
-    build_deep_research_graph,
+from src.deep_research import build_deep_research_graph, run_deep_research
+from src.config.deep_research_config import (
+    get_max_iterations,
+    get_max_concurrent_researchers,
+    get_max_tool_calls,
+    get_allow_clarification,
 )
-from src.config.deep_research_config import get_max_iterations
 from src.config.llm_config import get_model_settings
 from src.config.mcp_config import get_single_server_config
 from src.utils.stream_display import StreamDisplay
@@ -150,23 +153,32 @@ async def main_deep_research(
     model_provider: str,
     model_name: Optional[str],
     max_iterations: int,
+    max_concurrent: int,
+    max_tool_calls: int,
+    allow_clarification: bool,
     verbose: bool = False,
 ) -> None:
     """
-    Run deep research mode with human-in-the-loop clarification.
+    Run deep research mode with supervisor-researcher architecture.
 
-    This implements the "Clarify -> Plan -> Retrieve -> Read -> Reflect" loop.
+    This implements a multi-agent system where:
+    - Supervisor plans research strategy and delegates tasks
+    - Multiple researchers work in parallel on sub-topics
+    - Results are compressed and aggregated for final report
 
     Args:
         query: Research query to execute.
         mcp_ctx: MCP tools context.
         model_provider: LLM provider.
         model_name: Model name.
-        max_iterations: Maximum research iterations.
+        max_iterations: Maximum supervisor iterations.
+        max_concurrent: Maximum concurrent researchers.
+        max_tool_calls: Maximum tool calls per researcher.
+        allow_clarification: Whether to allow user clarification.
         verbose: Enable verbose output.
     """
-    print("\n🔬 Deep Research Mode")
-    print(f"Max iterations: {max_iterations}")
+    print("\n🔬 Deep Research Mode (Supervisor-Researcher Architecture)")
+    print(f"Max iterations: {max_iterations} | Max concurrent: {max_concurrent}")
     print("-" * 60)
 
     # Build the deep research graph
@@ -174,77 +186,62 @@ async def main_deep_research(
         hn_mcp_tools=mcp_ctx.hn_tools,
         model_provider=model_provider,
         model_name=model_name,
-        max_iterations=max_iterations,
     )
 
-    # Initialize state
-    state = DeepResearchState(
-        original_query=query,
-        max_iterations=max_iterations,
-    )
+    # Configuration
+    config = {
+        "configurable": {
+            "thread_id": f"deep_research_{uuid.uuid4().hex[:8]}",
+            "max_concurrent_researchers": max_concurrent,
+            "max_researcher_iterations": max_iterations,
+            "max_review_iterations": max_iterations,  # review 节点使用此配置
+            "max_tool_calls_per_researcher": max_tool_calls,
+            "allow_clarification": allow_clarification,
+            "model_provider": model_provider,
+            "model_name": model_name,
+        }
+    }
 
-    config = {"configurable": {"thread_id": f"deep_research_{uuid.uuid4().hex[:8]}"}}
+    # Define clarification callback
+    async def on_clarify_question(question: str) -> str:
+        """Handle clarification questions from the graph."""
+        print(f"\n💬 {question}")
+        print("   (输入 '直接开始' 或 'skip' 跳过澄清)")
 
-    # Run with human-in-the-loop for clarification
-    current_state_dict = state.model_dump()
-
-    while True:
-        if verbose:
-            print(f"\n[DEBUG] Running graph with state: clarified={current_state_dict.get('is_clarified')}")
-
-        # Run the graph
         try:
-            result = await graph.ainvoke(current_state_dict, config)
-        except Exception as e:
-            print(f"\n❌ Error during research: {e}")
-            if verbose:
-                import traceback
-                traceback.print_exc()
-            return
+            user_answer = input("\n📝 Your answer: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            return "直接开始"
 
-        if verbose:
-            print(f"[DEBUG] Graph result: is_clarified={result.get('is_clarified')}, "
-                  f"pending_question={result.get('pending_question')}, "
-                  f"is_sufficient={result.get('is_sufficient')}")
+        # Check if user wants to skip clarification
+        skip_phrases = ["直接开始", "跳过", "skip", "start", "开始研究", "不用问了"]
+        if any(phrase in user_answer.lower() for phrase in skip_phrases):
+            return "请直接开始研究，不需要更多澄清。"
+        return user_answer
 
-        # Check if we need clarification
-        if result.get("pending_question") and not result.get("is_clarified"):
-            print(f"\n💬 {result['pending_question']}")
-            print("   (输入 '直接开始' 跳过澄清)")
+    # Run deep research
+    try:
+        final_report = await run_deep_research(
+            query=query,
+            graph=graph,
+            config=config,
+            on_clarify_question=on_clarify_question if allow_clarification else None,
+        )
 
-            try:
-                user_answer = input("\n📝 Your answer: ").strip()
-            except (KeyboardInterrupt, EOFError):
-                print("\n\n已取消研究。")
-                return
-
-            # Check if user wants to skip clarification
-            skip_phrases = ["直接开始", "跳过", "skip", "start", "开始研究", "不用问了"]
-            if any(phrase in user_answer.lower() for phrase in skip_phrases):
-                current_state_dict = result.copy()
-                current_state_dict["is_clarified"] = True
-                current_state_dict["clarified_query"] = current_state_dict["original_query"]
-                current_state_dict["pending_question"] = None
-            else:
-                # Update state with answer and continue
-                current_state_dict = result.copy()
-                current_state_dict["user_answer"] = user_answer
-                current_state_dict["pending_question"] = None
+        if final_report:
+            print("\n" + "=" * 60)
+            print("📊 DEEP RESEARCH REPORT")
+            print("=" * 60 + "\n")
+            print(final_report)
+            print("\n" + "=" * 60)
         else:
-            # Graph completed or clarification done
-            if result.get("final_report"):
-                print("\n" + "=" * 60)
-                print("📊 DEEP RESEARCH REPORT")
-                print("=" * 60 + "\n")
-                print(result["final_report"])
-                print("\n" + "=" * 60)
+            print("\n⚠ No report generated. Please try again with a different query.")
 
-                # Print iteration stats
-                print(f"\n📈 Statistics:")
-                print(f"   - Iterations: {result.get('iteration_count', 0)}/{max_iterations}")
-                print(f"   - Sources visited: {len(result.get('visited_sources', []))}")
-                print(f"   - Info gathered: {len(result.get('gathered_info', []))} items")
-            break
+    except Exception as e:
+        print(f"\n❌ Error during research: {e}")
+        if verbose:
+            import traceback
+            traceback.print_exc()
 
 
 async def main(
@@ -255,6 +252,9 @@ async def main(
     enable_thinking: bool = False,
     deep_research: bool = False,
     max_iterations: Optional[int] = None,
+    max_concurrent: Optional[int] = None,
+    max_tool_calls: Optional[int] = None,
+    skip_clarify: bool = False,
 ) -> None:
     """
     Main function to run the research agent.
@@ -275,9 +275,12 @@ async def main(
         enable_thinking: If True, enables thinking mode for supported models
                         (e.g., DeepSeek-v3, kimi-k2-thinking via DashScope).
                         Resolved from CLI > env ENABLE_THINKING > default (False).
-        deep_research: If True, runs in Deep Research mode with iterative
-                      "Clarify -> Plan -> Retrieve -> Read -> Reflect" loop.
-        max_iterations: Maximum iterations for Deep Research mode (default: 5).
+        deep_research: If True, runs in Deep Research mode with supervisor-researcher
+                      multi-agent architecture.
+        max_iterations: Maximum supervisor iterations for Deep Research mode (default: 3).
+        max_concurrent: Maximum concurrent researchers (default: 5).
+        max_tool_calls: Maximum tool calls per researcher (default: 10).
+        skip_clarify: If True, skips user clarification step.
     """
     # Load environment variables
     load_dotenv()
@@ -313,12 +316,15 @@ async def main(
 
     # Resolve max iterations for deep research
     resolved_max_iterations = get_max_iterations(max_iterations)
+    resolved_max_concurrent = get_max_concurrent_researchers(max_concurrent)
+    resolved_max_tool_calls = get_max_tool_calls(max_tool_calls)
+    resolved_allow_clarification = get_allow_clarification(not skip_clarify if skip_clarify else None)
 
     print("=" * 60)
     mode_str = "Deep Research Mode" if deep_research else "Research Agent"
     print(f"{mode_str} - Powered by {'LangGraph' if deep_research else 'DeepAgents'}")
     thinking_str = " | Thinking: ON" if resolved_enable_thinking else ""
-    deep_str = f" | Max Iterations: {resolved_max_iterations}" if deep_research else ""
+    deep_str = f" | Max Iter: {resolved_max_iterations} | Concurrent: {resolved_max_concurrent}" if deep_research else ""
     print(f"Provider: {resolved_provider} | Model: {resolved_model_name or 'default'}{thinking_str}{deep_str}")
     print("=" * 60)
 
@@ -346,6 +352,9 @@ async def main(
                 model_provider=resolved_provider,
                 model_name=resolved_model_name,
                 max_iterations=resolved_max_iterations,
+                max_concurrent=resolved_max_concurrent,
+                max_tool_calls=resolved_max_tool_calls,
+                allow_clarification=resolved_allow_clarification,
                 verbose=verbose,
             )
         finally:
@@ -474,13 +483,30 @@ def run_cli() -> None:
     parser.add_argument(
         "--deep-research",
         action="store_true",
-        help="Enable Deep Research mode with iterative 'Clarify -> Plan -> Retrieve -> Read -> Reflect' loop",
+        help="Enable Deep Research mode with supervisor-researcher multi-agent architecture",
     )
     parser.add_argument(
         "--max-iterations",
         type=int,
-        default=3,
-        help="Maximum iterations for Deep Research mode (default: env DEEP_RESEARCH_MAX_ITERATIONS or 5)",
+        default=None,
+        help="Maximum supervisor iterations for Deep Research mode (default: 3)",
+    )
+    parser.add_argument(
+        "--max-concurrent",
+        type=int,
+        default=None,
+        help="Maximum concurrent researchers for Deep Research mode (default: 5)",
+    )
+    parser.add_argument(
+        "--max-tool-calls",
+        type=int,
+        default=None,
+        help="Maximum tool calls per researcher (default: 10)",
+    )
+    parser.add_argument(
+        "--skip-clarify",
+        action="store_true",
+        help="Skip user clarification step in Deep Research mode",
     )
     args = parser.parse_args()
 
@@ -493,6 +519,9 @@ def run_cli() -> None:
             enable_thinking=args.enable_thinking,
             deep_research=args.deep_research,
             max_iterations=args.max_iterations,
+            max_concurrent=args.max_concurrent,
+            max_tool_calls=args.max_tool_calls,
+            skip_clarify=args.skip_clarify,
         )
     )
 
