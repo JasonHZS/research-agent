@@ -1,7 +1,7 @@
 """
 Hugging Face Daily Papers Tool
 
-This module provides functionality to fetch daily papers from Hugging Face,
+This module provides functionality to fetch daily and weekly papers from Hugging Face,
 extracting titles, upvotes, and comments for each paper.
 """
 
@@ -13,6 +13,139 @@ from typing import Optional
 import requests
 from bs4 import BeautifulSoup
 from langchain_core.tools import tool
+
+
+def _validate_week_format(week: str) -> bool:
+    """
+    Validate week format (YYYY-WXX).
+    
+    Args:
+        week: Week string like '2025-W52' or '2025-W01'.
+        
+    Returns:
+        True if valid, raises ValueError if invalid.
+    """
+    pattern = r"^\d{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$"
+    if not re.match(pattern, week):
+        raise ValueError(
+            f"Invalid week format '{week}'. Use 'YYYY-WXX' format (e.g., '2025-W52')."
+        )
+    return True
+
+
+def _get_current_week() -> str:
+    """Get the current week in YYYY-WXX format."""
+    today = date.today()
+    return today.strftime("%Y-W%V")
+
+
+def fetch_huggingface_weekly_papers(
+    week: Optional[str] = None, limit: Optional[int] = 5
+) -> list[dict]:
+    """
+    Fetch weekly featured papers from Hugging Face for a specified week.
+
+    Args:
+        week: Week string in 'YYYY-WXX' format (e.g., '2025-W52'). 
+              Defaults to current week.
+        limit: Optional maximum number of papers to return, sorted by upvotes.
+
+    Returns:
+        List of dictionaries containing paper information with keys:
+        - title: Paper title
+        - arxiv_id: ArXiv paper ID (if available)
+        - url: URL to the paper on Hugging Face
+        - upvotes: Number of upvotes
+        - num_comments: Number of comments
+
+    Raises:
+        requests.RequestException: If the HTTP request fails.
+        ValueError: If the week format is invalid.
+    """
+    if week is None:
+        week = _get_current_week()
+    else:
+        _validate_week_format(week)
+
+    url = f"https://huggingface.co/papers/week/{week}"
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+
+    response = requests.get(url, headers=headers, timeout=30)
+    response.raise_for_status()
+
+    papers = _parse_weekly_papers_page(response.text, week)
+
+    # Sort by upvotes descending
+    papers.sort(key=lambda x: x.get("upvotes", 0), reverse=True)
+
+    if limit and limit > 0:
+        papers = papers[:limit]
+
+    return papers
+
+
+def _parse_weekly_papers_page(html_content: str, week: str) -> list[dict]:
+    """
+    Parse the Hugging Face weekly papers page HTML to extract paper information.
+
+    Args:
+        html_content: Raw HTML content from the weekly papers page.
+        week: The week being queried (for reference).
+
+    Returns:
+        List of paper dictionaries with title, arxiv_id, url, upvotes, and comments.
+    """
+    soup = BeautifulSoup(html_content, "html.parser")
+    papers = []
+
+    # Method 1: Try to parse embedded JSON data (most reliable)
+    # Weekly page might use different data-target attribute
+    try:
+        # Try multiple possible data targets
+        for target in ["DailyPapers", "WeeklyPapers", "Papers"]:
+            div = soup.find("div", attrs={"data-target": target})
+            if div and div.has_attr("data-props"):
+                props = json.loads(div["data-props"])
+                
+                # Try different possible keys for papers data
+                papers_data = None
+                for key in ["dailyPapers", "weeklyPapers", "papers"]:
+                    if key in props:
+                        papers_data = props[key]
+                        break
+                
+                if papers_data:
+                    for entry in papers_data:
+                        paper_data = entry.get("paper", entry)
+                        
+                        arxiv_id = paper_data.get("id")
+                        title = paper_data.get("title")
+                        
+                        if arxiv_id and title:
+                            papers.append({
+                                "title": title,
+                                "arxiv_id": arxiv_id,
+                                "url": f"https://huggingface.co/papers/{arxiv_id}",
+                                "upvotes": paper_data.get("upvotes", 0),
+                                "num_comments": entry.get("numComments", 0),
+                            })
+                    break
+    except (json.JSONDecodeError, AttributeError):
+        pass
+
+    if papers:
+        return papers
+
+    # Method 2: Fallback to DOM scraping (same logic as daily papers)
+    return _extract_papers_fallback(soup, week)
 
 
 def fetch_huggingface_daily_papers(
@@ -174,31 +307,53 @@ def _extract_papers_fallback(soup: BeautifulSoup, target_date: str) -> list[dict
 
 @tool
 def get_huggingface_papers_tool(
-    target_date: Optional[str] = None, limit: Optional[int] = None
+    target_date: Optional[str] = None,
+    week: Optional[str] = None,
+    limit: Optional[int] = None,
 ) -> str:
     """
-    Get daily papers from Hugging Face with their titles, upvotes, and comments.
+    Get daily or weekly papers from Hugging Face with their titles, upvotes, and comments.
 
     Use this tool to fetch the latest AI/ML research papers featured on
-    Hugging Face's daily papers page. Each paper includes title, ArXiv ID,
+    Hugging Face's papers page. Each paper includes title, ArXiv ID,
     upvotes count, and comments count.
 
+    You can fetch papers in two modes:
+    - Daily mode: Get papers for a specific date (default behavior)
+    - Weekly mode: Get featured papers for a specific week (use `week` parameter)
+
     Args:
-        target_date: Date in 'YYYY-MM-DD' format. Defaults to today's date
-                    if not specified.
+        target_date: Date in 'YYYY-MM-DD' format for daily papers. Defaults to 
+                    today's date if neither target_date nor week is specified.
+        week: Week in 'YYYY-WXX' format (e.g., '2025-W52', which is Dec 21-27) for weekly featured papers.
+              If provided, this takes precedence over target_date.
         limit: Optional number of top-voted papers to return. If not provided,
                returns all papers.
 
     Returns:
         Formatted string containing papers with their titles, upvotes, and comments.
+    
+    Examples:
+        - Get today's papers: get_huggingface_papers_tool()
+        - Get papers for a specific date: get_huggingface_papers_tool(target_date="2025-01-15")
+        - Get weekly featured papers: get_huggingface_papers_tool(week="2025-W52")
+        - Get top 10 weekly papers: get_huggingface_papers_tool(week="2025-W52", limit=10)
     """
     try:
-        papers = fetch_huggingface_daily_papers(target_date, limit=limit)
+        # Weekly mode takes precedence over daily mode
+        if week:
+            papers = fetch_huggingface_weekly_papers(week, limit=limit)
+            time_label = f"Week {week}"
+            mode = "Weekly"
+        else:
+            papers = fetch_huggingface_daily_papers(target_date, limit=limit)
+            time_label = target_date or date.today().isoformat()
+            mode = "Daily"
 
         if not papers:
-            return f"No papers found for {target_date or 'today'}."
+            return f"No papers found for {time_label}."
 
-        result_parts = [f"## Hugging Face Daily Papers ({target_date or date.today().isoformat()})\n"]
+        result_parts = [f"## Hugging Face {mode} Papers ({time_label})\n"]
         result_parts.append(f"Found {len(papers)} papers:\n")
 
         for i, paper in enumerate(papers, 1):
@@ -213,7 +368,7 @@ def get_huggingface_papers_tool(
             comments = paper.get("num_comments", 0)
             result_parts.append(f"\n**Upvotes:** {upvotes} | **Comments:** {comments}")
             
-            result_parts.append("\n") # Add extra newline separator
+            result_parts.append("\n")  # Add extra newline separator
 
         return "\n".join(result_parts)
 
