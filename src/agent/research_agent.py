@@ -20,6 +20,7 @@ Multi-turn Conversation Support:
 
 import os
 from collections.abc import AsyncGenerator
+from datetime import date
 from typing import Any, Optional
 
 from deepagents import create_deep_agent
@@ -227,12 +228,14 @@ def create_research_agent(
     # Get model configuration
     model_config = _get_model_config(resolved_provider, resolved_model_name, resolved_enable_thinking)
 
-    # Load the system prompt from template with reader type
+    # Load the system prompt from template with reader type and current date
     if system_prompt is None:
         reader_type = get_reader_type()
+        current_date = date.today().strftime("%Y-%m-%d")
         system_prompt = load_prompt(
             prompt_template,
             reader_type=reader_type.value,
+            current_date=current_date,
         )
 
     # Configure backend for persistent file storage
