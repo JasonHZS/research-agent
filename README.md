@@ -4,7 +4,9 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 
 ## Features
 
-- **Deep Research Mode**: Section-based parallel research with intent clarification, review loops, and structured report generation
+- **Deep Research Mode**: Section-based parallel research with intent clarification, query analysis, entity discovery, review loops, and structured report generation
+- **Smart Query Analysis**: Automatically identifies query types (list/comparison/deep_dive/general) and optimizes research strategy
+- **Entity Discovery**: For "list" queries (e.g., "What are the best X?"), discovers all relevant entities before deep diving
 - **ArXiv Search**: Search and retrieve academic papers using ArXiv's official API
 - **Hacker News Integration**: Get trending stories and discussions via MCP
 - **Hugging Face Daily Papers**: Fetch daily featured AI/ML papers with titles and abstracts
@@ -19,6 +21,8 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 |---------|-------------|-------------------|
 | Execution | Single-turn ReAct | Multi-turn state machine |
 | Intent Clarification | None | Supported (skippable) |
+| Query Analysis | None | Identifies query type (list/comparison/deep_dive/general) |
+| Entity Discovery | None | Pre-research discovery for "list" queries |
 | Research Planning | Implicit | Explicit section generation |
 | Parallel Execution | None | Section-based parallel research |
 | Review Mechanism | None | Review node evaluates evidence sufficiency |
@@ -39,6 +43,8 @@ src/
 │   ├── structured_outputs.py     # Pydantic models for structured LLM outputs
 │   ├── nodes/                    # Graph nodes
 │   │   ├── clarify.py            # Intent clarification node
+│   │   ├── analyze.py            # Query type analysis node
+│   │   ├── discover.py           # Entity discovery node (for list queries)
 │   │   ├── brief.py              # Section planning node
 │   │   ├── researcher.py         # Researcher subgraph (parallel execution)
 │   │   ├── review.py             # Evidence review node
@@ -68,11 +74,19 @@ graph TB
         Start([用户查询])
     end
 
-    subgraph clarify_loop [意图澄清]
+    subgraph clarify_phase [意图澄清]
         Clarify[Clarify Node]
         UserInput([用户回答])
         Clarify -->|需要澄清| UserInput
         UserInput --> Clarify
+    end
+
+    subgraph analyze_phase [查询分析]
+        Analyze[Analyze Node]
+    end
+
+    subgraph discovery_phase [前置探索]
+        Discover[Discover Node]
     end
 
     subgraph parallel [并行研究]
@@ -101,7 +115,10 @@ graph TB
     end
 
     Start --> Clarify
-    Clarify -->|Command| Plan
+    Clarify --> Analyze
+    Analyze -->|list 类型| Discover
+    Analyze -->|其他类型| Plan
+    Discover --> Plan
     Aggregate --> Review
     Review -->|证据充足| Report
     Report --> Final
@@ -227,10 +244,12 @@ uv run python -m src.main --deep-research --model kimi-k2-thinking -q "LLM 推�
 
 **Deep Research Flow:**
 1. **Clarify** - Asks clarifying questions if the query is ambiguous (can be skipped)
-2. **Plan Sections** - Generates 3-7 independent research sections
-3. **Parallel Research** - Each section is researched in parallel using available tools
-4. **Review** - Evaluates evidence sufficiency across all sections
-5. **Iterate or Report** - If gaps exist, re-research specific sections; otherwise generate final report
+2. **Analyze** - Identifies query type (list/comparison/deep_dive/general) and determines output format
+3. **Discover** (list queries only) - Performs broad search to discover all relevant entities before deep research
+4. **Plan Sections** - Generates 3-7 independent research sections based on query or discovered entities
+5. **Parallel Research** - Each section is researched in parallel using available tools
+6. **Review** - Evaluates evidence sufficiency across all sections
+7. **Iterate or Report** - If gaps exist, re-research specific sections; otherwise generate final report
 
 For detailed architecture documentation, see [`src/deep_research/README.md`](src/deep_research/README.md).
 

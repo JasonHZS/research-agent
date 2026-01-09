@@ -39,6 +39,25 @@ class Section(BaseModel):
     sources: list[str] = Field(default_factory=list, description="信息来源列表")
 
 
+# ==============================================================================
+# 前置探索模型
+# ==============================================================================
+
+
+class DiscoveredItem(BaseModel):
+    """
+    整体检索阶段发现的单个实体/项目。
+
+    用于 list 类型查询，记录发现的每个选项/实体。
+    """
+
+    name: str = Field(description="实体名称（如模型名、项目名）")
+    category: str = Field(default="", description="分类/类别")
+    brief: str = Field(default="", description="简要描述")
+    source: str = Field(default="", description="发现来源")
+    urls: list[str] = Field(default_factory=list, description="相关链接（GitHub/官网/论文）")
+
+
 def section_reducer(
     existing: list[Section], updates: list[Section]
 ) -> list[Section]:
@@ -84,6 +103,9 @@ class AgentOutputState(TypedDict):
 
     original_query: str
     messages: list[AnyMessage]
+    query_type: str
+    output_format: str
+    discovered_items: list[DiscoveredItem]
     research_brief: str
     sections: list[Section]
     final_report: str
@@ -100,10 +122,28 @@ class AgentState(MessagesState):
 
     继承 MessagesState 提供：
     - messages: Annotated[list[AnyMessage], add_messages]
+
+    增强功能：
+    - 支持"前置探索"：先整体检索发现实体，再针对每个实体深入研究
+    - 查询类型识别：list/comparison/deep_dive/general
     """
 
     # 用户交互（澄清问题/确认消息通过 messages 传递）
     original_query: str = ""
+
+    # === 查询分析 ===
+    # 查询类型: list (有哪些) / comparison (对比) / deep_dive (深入) / general (一般)
+    query_type: Literal["list", "comparison", "deep_dive", "general"] = "general"
+    # 输出格式: table (表格) / list (清单) / prose (文章)
+    output_format: Literal["table", "list", "prose"] = "prose"
+
+    # === 前置探索（整体检索）===
+    # 发现的实体列表（用于 list 类型查询）
+    discovered_items: list[DiscoveredItem] = []
+    # 前置探索是否完成
+    discovery_complete: bool = False
+    # 整体检索的原始结果（用于生成章节）
+    discovery_summary: str = ""
 
     # 研究简报 (澄清后生成)
     research_brief: str = ""

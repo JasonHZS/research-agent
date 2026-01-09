@@ -1,11 +1,17 @@
 """
 Deep Research Graph Construction
 
-构建基于 Section 的深度研究图：
-1. clarify -> plan_sections -> [Send: researcher] -> aggregate -> review -> (loop or) final_report
+构建基于 Section 的深度研究图（增强方案）：
+1. clarify -> analyze -> discover (list类型) -> plan_sections -> [Send: researcher] 
+   -> aggregate -> review -> (loop or) final_report
 
 使用 LangGraph Command + Send API 实现原生图级别的并行研究。
 节点使用 Command API 控制路由，简化图结构。
+
+增强方案：
+- 添加 analyze 节点识别查询类型
+- 添加 discover 节点执行"整体发现"
+- 对于 list 类型查询，先发现所有实体，再为每个实体生成专门章节
 """
 
 from typing import Literal, Optional
@@ -13,9 +19,12 @@ from typing import Literal, Optional
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command
 
 from .nodes import (
+    analyze_query_node,
     clarify_with_user_node,
+    discover_node,
     final_report_node,
     plan_sections_node,
     review_node,
@@ -49,42 +58,13 @@ async def aggregate_sections_node(
     # 检查是否所有 section 都已完成
     sections = get_state_value(state, "sections", [])
 
-    # 打印调试信息（可选）
+    # 打印调试信息
     completed = sum(1 for s in sections if s.status == "completed")
     total = len(sections)
+    print(f"\n[Aggregate]: {completed}/{total} 章节已完成\n")
 
     # 返回空更新，状态已通过 reducer 更新
     return {}
-
-
-# ==============================================================================
-# 路由函数
-# ==============================================================================
-
-
-def route_after_review(
-    state: AgentState,
-) -> Literal["dispatch", "final_report"]:
-    """
-    Review 后的路由：
-
-    - 如果有 pending 的 section 且未达到最大迭代次数 -> 回到 dispatch
-    - 否则 -> 生成最终报告
-    """
-    sections = get_state_value(state, "sections", [])
-    review_iterations = get_state_value(state, "review_iterations", 0)
-    max_review_iterations = get_state_value(state, "max_review_iterations", 2)
-
-    # 检查是否达到最大迭代次数
-    if review_iterations >= max_review_iterations:
-        return "final_report"
-
-    # 检查是否有 pending 的 section
-    pending = [s for s in sections if s.status == "pending"]
-    if pending:
-        return "dispatch"
-
-    return "final_report"
 
 
 # ==============================================================================
@@ -101,13 +81,14 @@ def build_deep_research_graph(
     构建完整的深度研究图。
 
     流程:
-    clarify -> plan_sections -> dispatch (Send) -> researcher -> aggregate -> review
-                                    ^                                           |
-                                    |___________________________________________|
-                                                    (if gaps exist)
-                                                           |
-                                                           v
-                                                    final_report -> END
+    clarify -> analyze -> discover (list类型) -> plan_sections -> dispatch (Send) 
+                            |                ^
+                            |                |
+                            +-- (其他类型) ---+
+                                             |
+    -> researcher -> aggregate -> review ->   (loop or) final_report -> END
+           ^                         |
+           |_________________________| (if gaps exist)
 
     Args:
         hn_mcp_tools: Hacker News MCP 工具（可选）。
@@ -130,8 +111,21 @@ def build_deep_research_graph(
         output=AgentOutputState,
     )
 
+    # === 创建 discover 节点的闭包（注入工具） ===
+    async def discover_wrapper(
+        state: AgentState, config: RunnableConfig
+    ) -> Command[Literal["plan_sections"]]:
+        result = await discover_node(state, config, all_tools)
+        # 返回 Command 跳转到 plan_sections
+        return Command(
+            goto="plan_sections",
+            update=result,
+        )
+
     # 添加节点
     workflow.add_node("clarify", clarify_with_user_node)
+    workflow.add_node("analyze", analyze_query_node)  # 增强方案：查询分析
+    workflow.add_node("discover", discover_wrapper)  # 增强方案：前置探索
     workflow.add_node("plan_sections", plan_sections_node)
     workflow.add_node("researcher", researcher_subgraph)  # 接收 Send 的并行任务
     workflow.add_node("aggregate", aggregate_sections_node)
@@ -141,12 +135,18 @@ def build_deep_research_graph(
     # 设置入口点
     workflow.add_edge(START, "clarify")
 
-    # clarify 使用 Command API 控制路由，不需要添加静态边
-    # Command(goto="plan_sections") 或 Command(goto=END) 直接决定下一节点
+    # clarify 使用 Command API 控制路由：
+    # - Command(goto="analyze") 继续分析
+    # - Command(goto=END) 需要用户回答澄清问题
+
+    # analyze 使用 Command API 控制路由：
+    # - Command(goto="discover") 如果是 list 类型查询
+    # - Command(goto="plan_sections") 其他类型
+
+    # discover 使用 Command API 跳转到 plan_sections
 
     # plan_sections 使用 Command API 控制路由，直接派发 Send 到 researcher
     # Command(goto=[Send("researcher", ...), ...]) 实现并行分发
-    # 不需要添加静态边，Command 会自动处理
 
     # researcher -> aggregate (Fan-in)
     workflow.add_edge("researcher", "aggregate")
@@ -154,15 +154,9 @@ def build_deep_research_graph(
     # aggregate -> review
     workflow.add_edge("aggregate", "review")
 
-    # review -> dispatch 或 final_report
-    workflow.add_conditional_edges(
-        "review",
-        route_after_review,
-        {
-            "dispatch": "plan_sections",  # 回到 plan_sections 会重新触发 dispatch
-            "final_report": "final_report",
-        },
-    )
+    # review 使用 Command API 控制路由：
+    # - Command(goto="plan_sections") 如果需要重新研究
+    # - Command(goto="final_report") 如果信息充足
 
     # final_report -> END
     workflow.add_edge("final_report", END)
@@ -194,6 +188,12 @@ async def run_deep_research(
     Returns:
         最终研究报告。
     """
+    # 确保设置了足够的递归限制
+    # LangGraph 默认 recursion_limit=25，但深度研究涉及多轮工具调用，容易超限
+    # 该参数会传递给 graph.ainvoke()，由 LangGraph 内部检查执行步数
+    if "recursion_limit" not in config:
+        config["recursion_limit"] = 100
+
     # 初始状态
     initial_state = {
         "messages": [HumanMessage(content=query)],

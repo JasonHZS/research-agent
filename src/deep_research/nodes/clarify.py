@@ -39,13 +39,13 @@ def _get_config(config: RunnableConfig) -> DeepResearchConfig:
 async def clarify_with_user_node(
     state: AgentState,
     config: RunnableConfig,
-) -> Command[Literal["plan_sections", "__end__"]]:
+) -> Command[Literal["analyze", "__end__"]]:
     """
     分析用户查询，决定是否需要澄清。
 
     使用 Command API 控制流转移：
     - 如果需要澄清：goto=END，将澄清问题作为 AIMessage 添加到 messages
-    - 如果查询清晰：goto="plan_sections"，将确认消息作为 AIMessage 添加到 messages
+    - 如果查询清晰：goto="analyze"，将确认消息作为 AIMessage 添加到 messages
 
     Args:
         state: 当前 agent 状态，包含用户消息
@@ -63,10 +63,10 @@ async def clarify_with_user_node(
     user_messages = [m.content for m in messages if isinstance(m, HumanMessage)]
     original_query = "\n".join(user_messages) if user_messages else ""
 
-    # 如果禁用澄清，直接跳过进入 plan_sections
+    # 如果禁用澄清，直接跳过进入 analyze
     if not deep_config.allow_clarification:
         return Command(
-            goto="plan_sections",
+            goto="analyze",
             update={"original_query": original_query},
         )
 
@@ -97,10 +97,10 @@ async def clarify_with_user_node(
             },
         )
     else:
-        # 不需要澄清：继续进入 plan_sections
+        # 不需要澄清：继续进入 analyze（查询分析节点）
         # 设置 original_query 供后续节点使用
         return Command(
-            goto="plan_sections",
+            goto="analyze",
             update={
                 "messages": [AIMessage(content=result.verification)],
                 "original_query": original_query,

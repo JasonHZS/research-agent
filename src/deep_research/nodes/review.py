@@ -2,9 +2,13 @@
 Review Node
 
 评估研究覆盖度，决定是否需要继续研究或可以生成最终报告。
+使用 Command API 控制路由。
 """
 
+from typing import Literal
+
 from langchain_core.runnables import RunnableConfig
+from langgraph.types import Command
 
 from src.prompts import load_prompt
 
@@ -32,17 +36,16 @@ def _get_config(config: RunnableConfig) -> DeepResearchConfig:
 async def review_node(
     state: AgentState,
     config: RunnableConfig,
-) -> dict:
+) -> Command[Literal["plan_sections", "final_report"]]:
     """
     评估研究覆盖度。
 
-    检查每个章节的内容是否充足，决定：
-    - 如果信息充足或达到最大迭代次数：继续到 final_report
-    - 如果有信息缺口且还有迭代次数：标记需要重新研究的章节为 pending
+    检查每个章节的内容是否充足，使用 Command API 决定下一步：
+    - 如果信息充足或达到最大迭代次数：goto="final_report"
+    - 如果有信息缺口且还有迭代次数：goto="plan_sections"（重新派发）
 
     返回：
-    - sections: 更新后的章节列表（可能有些被重置为 pending）
-    - review_iterations: 递增的计数
+    - Command 对象，包含路由决策和状态更新
     """
     deep_config = _get_config(config)
 
@@ -86,11 +89,16 @@ async def review_node(
         llm_with_output = llm.with_structured_output(ReviewResult)
         result: ReviewResult = await llm_with_output.ainvoke(prompt_text)
 
-        # 如果信息充足或达到最大迭代，直接返回
+        print(f"\n[Review]: 评分={result.overall_score}/10, 充足={result.is_sufficient}")
+        print(f"  迭代: {review_iterations + 1}/{max_review_iterations}")
+
+        # 如果信息充足或达到最大迭代，进入报告生成
         if result.is_sufficient or (review_iterations + 1) >= max_review_iterations:
-            return {
-                "review_iterations": review_iterations + 1,
-            }
+            print("  -> 进入最终报告生成\n")
+            return Command(
+                goto="final_report",
+                update={"review_iterations": review_iterations + 1},
+            )
 
         # 否则，将需要重新研究的章节标记为 pending
         sections_to_retry = set(result.sections_to_retry)
@@ -110,14 +118,22 @@ async def review_node(
             else:
                 updated_sections.append(s)
 
-        return {
-            "sections": updated_sections,
-            "review_iterations": review_iterations + 1,
-        }
+        print(f"  需要重新研究: {list(sections_to_retry)}")
+        print("  -> 返回 plan_sections 重新派发\n")
 
-    except Exception:
+        return Command(
+            goto="plan_sections",
+            update={
+                "sections": updated_sections,
+                "review_iterations": review_iterations + 1,
+            },
+        )
+
+    except Exception as e:
         # 出错时直接继续到报告生成
-        return {
-            "review_iterations": review_iterations + 1,
-        }
+        print(f"\n[Review]: 评估出错: {e}，直接生成报告\n")
+        return Command(
+            goto="final_report",
+            update={"review_iterations": review_iterations + 1},
+        )
 

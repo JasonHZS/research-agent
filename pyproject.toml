@@ -24,6 +24,7 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "ruff>=0.5.0",
+    "grandalf>=0.8.0",
 ]
 
 [build-system]
@@ -37,6 +38,7 @@ packages = ["src"]
 dev-dependencies = [
     "pytest>=8.0.0",
     "ruff>=0.5.0",
+    "grandalf>=0.8.0",
 ]
 
 [tool.ruff]

@@ -1,6 +1,6 @@
 # Deep Research Mode
 
-Deep Research Mode 是一个基于 LangGraph StateGraph 构建的深度研究模块，实现了 **"澄清意图 → 规划章节 → 并行研究 → 评估反思 → 生成报告"** 的基于 Section 的并行研究流程。
+Deep Research Mode 是一个基于 LangGraph StateGraph 构建的深度研究模块，实现了 **"澄清意图 → 查询分析 → 前置探索 → 规划章节 → 并行研究 → 评估反思 → 生成报告"** 的基于 Section 的并行研究流程。
 
 ## 架构概览
 
@@ -10,11 +10,19 @@ graph TB
         Start([用户查询])
     end
 
-    subgraph clarify_loop [意图澄清]
+    subgraph clarify_phase [意图澄清]
         Clarify[Clarify Node]
         UserInput([用户回答])
         Clarify -->|需要澄清| UserInput
         UserInput --> Clarify
+    end
+
+    subgraph analyze_phase [查询分析]
+        Analyze[Analyze Node]
+    end
+
+    subgraph discovery_phase [前置探索]
+        Discover[Discover Node]
     end
 
     subgraph parallel [并行研究]
@@ -43,7 +51,10 @@ graph TB
     end
 
     Start --> Clarify
-    Clarify -->|Command| Plan
+    Clarify --> Analyze
+    Analyze -->|list 类型| Discover
+    Analyze -->|其他类型| Plan
+    Discover --> Plan
     Aggregate --> Review
     Review -->|证据充足| Report
     Report --> Final
@@ -61,8 +72,11 @@ graph TB
 |------|------|------|
 | `messages` | `list[AnyMessage]` | 对话消息列表（继承） |
 | `original_query` | `str` | 用户原始查询 |
-| `needs_clarification` | `bool` | 是否需要澄清 |
-| `clarification_question` | `str` | 待用户回答的澄清问题 |
+| `query_type` | `Literal["list", "comparison", "deep_dive", "general"]` | 查询类型（由 Analyze 节点识别） |
+| `output_format` | `Literal["table", "list", "prose"]` | 期望输出格式 |
+| `discovered_items` | `list[DiscoveredItem]` | 前置探索发现的实体列表 |
+| `discovery_complete` | `bool` | 前置探索是否完成 |
+| `discovery_summary` | `str` | 整体检索摘要 |
 | `research_brief` | `str` | 研究简报（澄清后生成） |
 | `sections` | `list[Section]` | 章节列表（使用自定义 reducer） |
 | `review_iterations` | `int` | Review 迭代轮数 |
@@ -82,6 +96,18 @@ graph TB
 | `sources` | `list[str]` | 信息来源列表 |
 
 **Section Reducer**：`section_reducer` 函数根据 `title` 匹配并合并更新，实现状态的增量更新。
+
+#### DiscoveredItem 模型
+
+`DiscoveredItem` 是前置探索阶段发现的实体，用于 list 类型查询：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `name` | `str` | 实体名称（如模型名、项目名） |
+| `category` | `str` | 分类/类别 |
+| `brief` | `str` | 简要描述 |
+| `source` | `str` | 发现来源 |
+| `urls` | `list[str]` | 相关链接（GitHub/官网/论文） |
 
 #### Researcher 状态 (`ResearcherState`)
 
@@ -123,15 +149,93 @@ graph TB
 
 **路由**（使用 Command API）：
 - `need_clarification=true` → `Command(goto=END)` 中断等待用户输入
-- `need_clarification=false` → `Command(goto="plan_sections")` 继续研究
+- `need_clarification=false` → `Command(goto="analyze")` 继续分析查询
 
-#### 2. Plan Sections Node - 章节规划
+#### 2. Analyze Node - 查询分析
+
+**职责**：分析用户查询类型，决定是否需要前置探索（discover）阶段。
+
+**实现**：`src/deep_research/nodes/analyze.py`
+
+**Prompt 模板**：`src/prompts/templates/deep_research/analyze.md`
+
+**查询类型识别**：
+| 类型 | 说明 | 示例 |
+|------|------|------|
+| `list` | "有哪些"类型，枚举/列表查询 | "有哪些开源 LLM？" |
+| `comparison` | 对比分析 | "GPT-4 和 Claude 3 的区别" |
+| `deep_dive` | 深入研究单一主题 | "详细解释 Transformer 注意力机制" |
+| `general` | 一般性查询 | "LLM 的最新进展" |
+
+**结构化输出**：`QueryAnalysis` 模型
+```python
+{
+  "query_type": "list",           # 查询类型
+  "output_format": "table",       # 期望输出格式 (table/list/prose)
+  "needs_discovery": true,        # 是否需要前置探索
+  "discovery_target": "开源 LLM", # 要发现的目标类型
+  "reasoning": "分析理由"
+}
+```
+
+**路由**（使用 Command API）：
+- `query_type="list"` 且 `needs_discovery=true` → `Command(goto="discover")` 前置探索
+- 其他情况 → `Command(goto="plan_sections")` 直接规划章节
+
+#### 3. Discover Node - 前置探索
+
+**职责**：执行广泛的整体检索，发现所有相关实体。实现"先整体检索，再分别深入"策略。
+
+**实现**：`src/deep_research/nodes/discover.py`
+
+**Prompt 模板**：`src/prompts/templates/deep_research/discover.md`
+
+**触发条件**：仅当 `query_type="list"` 时执行，其他类型跳过。
+
+**子图流程**：
+```
+START → discover_invoke → discover_tools → [循环或提取] → extract_output → END
+```
+
+**结构化输出**：`DiscoveryResult` 模型
+```python
+{
+  "entities": [
+    {
+      "name": "LLaMA 3",
+      "category": "开源基础模型",
+      "brief": "Meta 发布的开源大语言模型",
+      "source": "HuggingFace",
+      "priority": "high"
+    }
+  ],
+  "summary": "整体发现摘要",
+  "total_found": 10,
+  "categories": ["开源基础模型", "指令微调模型"],
+  "search_coverage": "搜索覆盖说明"
+}
+```
+
+**迭代控制**：
+- 最多执行 `max_discover_iterations` 轮搜索（默认 5 轮）
+- 调用 `research_complete` 工具时提前完成
+- 完成后通过 `extract_output` 节点提取结构化实体列表
+
+**与 Plan Sections 的协作**：
+- 发现的实体列表传递给 Plan Sections 节点
+- Plan Sections 可基于实体列表生成专门的章节（如每个实体一个章节）
+- 使用 `brief_from_discovery.md` 模板生成基于实体的研究大纲
+
+#### 4. Plan Sections Node - 章节规划
 
 **职责**：将研究问题分解为 3-7 个独立的章节，每个章节可并行研究。
 
 **实现**：`src/deep_research/nodes/brief.py`
 
-**Prompt 模板**：`src/prompts/templates/deep_research/plan.md`
+**Prompt 模板**：
+- `src/prompts/templates/deep_research/plan.md`（标准查询）
+- `src/prompts/templates/deep_research/brief_from_plan.md`（基于澄清结果）
+- `src/prompts/templates/deep_research/brief_from_discovery.md`（基于前置探索结果）
 
 **结构化输出**：`ResearchBrief` 模型
 ```python
@@ -166,7 +270,7 @@ sends = [
 return Command(goto=sends, update={"sections": sections, ...})
 ```
 
-#### 3. Dispatch - 并行分发（内聚于 Plan Sections Node）
+#### 5. Dispatch - 并行分发（内聚于 Plan Sections Node）
 
 **职责**：为每个 `pending` 状态的 Section 创建并行的 Researcher 任务。
 
@@ -181,7 +285,7 @@ return Command(goto=sends, update={...})
 
 > **设计说明**：将 dispatch 逻辑内聚到 Plan Sections Node 中，使得"规划"和"派发"在同一个节点完成，代码更内聚，图结构更简洁。
 
-#### 4. Researcher Subgraph - 研究执行
+#### 6. Researcher Subgraph - 研究执行
 
 **职责**：接收 Section，执行工具调用，填充研究内容。
 
@@ -228,7 +332,7 @@ START → researcher_invoke → tools → [循环或完成] → compress_output 
 
 **Context 压缩**：使用 `compress_output` 节点压缩工具消息，避免上下文膨胀
 
-#### 5. Aggregate Node - 结果聚合
+#### 7. Aggregate Node - 结果聚合
 
 **职责**：作为所有并行 Researcher 的汇聚点（Fan-in）。
 
@@ -239,7 +343,7 @@ START → researcher_invoke → tools → [循环或完成] → compress_output 
 - 等待所有并行 researcher 完成后继续执行
 - 可选地打印调试信息（已完成章节数量）
 
-#### 6. Review Node - 评估反思
+#### 8. Review Node - 评估反思
 
 **职责**：评估所有章节的研究充分性，决定是否需要继续研究。
 
@@ -279,7 +383,7 @@ START → researcher_invoke → tools → [循环或完成] → compress_output 
 
 > **设计说明**：Review 打回时不应重新生成研究大纲。大纲是根据用户意图设计的"研究方向"，Review 只是评估"研究执行的充分性"。重新生成大纲会丢失已完成章节的内容，因此 Review 只将特定章节标记为 `pending`，然后重新 dispatch。
 
-#### 7. Final Report Node - 报告生成
+#### 9. Final Report Node - 报告生成
 
 **职责**：综合所有章节内容，生成结构化的研究报告。
 
@@ -401,6 +505,8 @@ python src/deep_research/tests/debug_full_graph.py
 |------|----------|-------------------|
 | 执行方式 | 单轮 ReAct | 多轮状态机迭代 |
 | 意图澄清 | 无 | 支持（可跳过） |
+| 查询分析 | 无 | 识别查询类型（list/comparison/deep_dive/general） |
+| 前置探索 | 无 | 对 list 类型查询先发现实体 |
 | 研究规划 | 隐式 | 显式章节生成 |
 | 并行执行 | 无 | 基于 Section 的并行研究 |
 | 反思机制 | 无 | Review 节点评估证据充足度 |
@@ -410,7 +516,48 @@ python src/deep_research/tests/debug_full_graph.py
 
 ## 架构特点
 
-### 1. 基于 Section 的并行化
+### 1. 查询类型识别与自适应流程
+
+**核心理念**：不同类型的查询需要不同的研究策略。通过 Analyze 节点识别查询类型，动态调整后续流程。
+
+**查询类型**：
+| 类型 | 特征 | 处理策略 |
+|------|------|----------|
+| `list` | "有哪些"、"列举"、"盘点" | 先整体发现所有实体，再分别深入研究 |
+| `comparison` | "对比"、"区别"、"vs" | 直接规划对比维度，并行研究各方 |
+| `deep_dive` | "详细解释"、"深入分析" | 直接规划章节，深入单一主题 |
+| `general` | 一般性查询 | 标准流程，直接规划章节 |
+
+**优势**：
+- **更准确的研究策略**：根据查询意图选择最合适的研究方式
+- **避免遗漏**：list 类型查询先整体发现，确保不遗漏重要实体
+- **输出格式优化**：根据查询类型推荐最佳输出格式（表格/列表/文章）
+
+### 2. 前置探索（Discovery）策略
+
+**核心理念**：对于"有哪些"类型的查询，先执行广泛的整体检索发现所有相关实体，再为每个实体生成专门的研究章节。
+
+**解决的问题**：
+- 传统方式：直接规划章节可能遗漏重要实体
+- 新方式：先发现再深入，确保研究覆盖完整
+
+**实现流程**：
+```
+Analyze(识别 list 类型) → Discover(整体检索) → Plan Sections(基于实体生成章节)
+```
+
+**示例**：
+```
+用户查询: "目前有哪些开源的多模态大模型？"
+
+1. Analyze: 识别为 list 类型，需要前置探索
+2. Discover: 搜索发现 [LLaVA, Qwen-VL, InternVL, CogVLM, ...]
+3. Plan Sections: 为每个模型生成专门章节
+4. Parallel Research: 并行研究每个模型
+5. Report: 生成完整的多模态大模型综述
+```
+
+### 3. 基于 Section 的并行化
 
 **核心理念**：将研究报告分解为独立的 Section，每个 Section 由专门的 Researcher 并行研究。
 
@@ -429,7 +576,7 @@ return Command(goto=sends, update={"sections": sections, ...})
 # section_reducer 自动合并所有 Researcher 返回的更新
 ```
 
-### 2. Researcher 子图设计
+### 4. Researcher 子图设计
 
 **内部循环**：`researcher_invoke → tools → [循环或完成] → compress_output`
 
@@ -438,7 +585,7 @@ return Command(goto=sends, update={"sections": sections, ...})
 - **完成信号**：`research_complete` 工具允许提前终止
 - **上下文压缩**：压缩节点避免上下文膨胀
 
-### 3. Review 驱动的迭代
+### 5. Review 驱动的迭代
 
 **评估维度**：覆盖度、深度、多样性、一致性、时效性
 
@@ -449,7 +596,7 @@ return Command(goto=sends, update={"sections": sections, ...})
 
 **核心原则**：大纲 = 研究方向（Plan 决定），充分性 = 研究执行（Review 评估）。两者职责分离。
 
-### 4. 状态管理
+### 6. 状态管理
 
 **Section Reducer**：根据 `title` 匹配并合并更新，实现增量更新
 
@@ -514,12 +661,14 @@ return Command(goto=sends, update={"sections": sections, ...})
 
 ## 设计原则
 
-1. **并行优先**：利用 LangGraph Command + Send API 实现真并行
-2. **状态隔离**：每个 Researcher 拥有独立状态，避免冲突
-3. **增量更新**：使用自定义 Reducer 支持并行和迭代更新
-4. **上下文压缩**：在 Researcher 内部压缩，避免主图上下文膨胀
-5. **人在环优化**：支持澄清、Review 人工介入（可选）
-6. **路由内聚**：使用 Command API 将路由逻辑内聚到节点中，简化图结构
+1. **查询感知**：识别查询类型，动态调整研究策略
+2. **发现优先**：对 list 类型查询先整体发现，避免遗漏
+3. **并行优先**：利用 LangGraph Command + Send API 实现真并行
+4. **状态隔离**：每个 Researcher 拥有独立状态，避免冲突
+5. **增量更新**：使用自定义 Reducer 支持并行和迭代更新
+6. **上下文压缩**：在 Researcher 内部压缩，避免主图上下文膨胀
+7. **人在环优化**：支持澄清、Review 人工介入（可选）
+8. **路由内聚**：使用 Command API 将路由逻辑内聚到节点中，简化图结构
 
 ---
 

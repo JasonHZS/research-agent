@@ -40,6 +40,74 @@ class ClarifyWithUser(BaseModel):
 
 
 # ==============================================================================
+# 查询分析 (Analyze Node 输出)
+# ==============================================================================
+
+
+class QueryAnalysis(BaseModel):
+    """
+    查询分析结果。
+
+    用于 analyze 节点识别查询类型和所需输出格式，
+    决定是否需要前置探索（discover）阶段。
+    """
+
+    query_type: Literal["list", "comparison", "deep_dive", "general"] = Field(
+        description="查询类型: list(有哪些/枚举), comparison(对比分析), deep_dive(深入研究), general(一般)"
+    )
+    output_format: Literal["table", "list", "prose"] = Field(
+        description="期望输出格式: table(表格), list(清单), prose(文章)"
+    )
+    needs_discovery: bool = Field(
+        description="是否需要先进行整体发现/枚举（用于 list 类型查询）"
+    )
+    discovery_target: str = Field(
+        default="",
+        description="如果需要发现，要发现的目标类型（如：某类模型、工具、框架）",
+    )
+    reasoning: str = Field(description="分析理由")
+
+
+# ==============================================================================
+# 前置探索输出 (Discover Node)
+# ==============================================================================
+
+
+class DiscoveredEntity(BaseModel):
+    """
+    前置探索阶段识别的单个实体。
+
+    用于整体检索后提取的每个选项/模型/工具等。
+    """
+
+    name: str = Field(description="实体名称（如公司名、人名、模型名、工具名）")
+    category: str = Field(default="", description="分类/类别")
+    brief: str = Field(description="一句话描述")
+    source: str = Field(default="", description="发现来源")
+    priority: Literal["high", "medium", "low"] = Field(
+        default="medium", description="研究优先级"
+    )
+
+
+class DiscoveryResult(BaseModel):
+    """
+    前置探索的完整结果。
+
+    包含发现的所有实体和整体摘要。
+    """
+
+    entities: list[DiscoveredEntity] = Field(description="发现的实体列表")
+    summary: str = Field(description="整体发现摘要（包含市场概况、主要分类等）")
+    total_found: int = Field(description="总共发现的实体数量")
+    categories: list[str] = Field(
+        default_factory=list, description="发现的分类列表"
+    )
+    search_coverage: str = Field(
+        default="", description="搜索覆盖说明（搜索了哪些来源）"
+    )
+
+
+# ==============================================================================
 # 研究计划 (Plan Node 输出)
 # ==============================================================================
 
