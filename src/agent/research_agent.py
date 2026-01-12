@@ -42,6 +42,7 @@ from src.tools.hf_daily_papers import get_huggingface_papers_tool
 from src.tools.zyte_reader import get_zyte_article_list_tool
 from src.tools.bocha_search import bocha_web_search_tool
 from src.tools.github_search import github_search_tool
+from src.tools.tavily_search import tavily_search_tool
 
 # Available models on Aliyun DashScope
 ALIYUN_MODELS = {
@@ -204,6 +205,7 @@ def create_research_agent(
         get_zyte_article_list_tool,  # Fetch article list from any blog/news site
         bocha_web_search_tool,  # General web search
         github_search_tool,  # Search GitHub repos, issues, commits (no auth)
+        tavily_search_tool,  # Fallback search for finance/news/specialized domains
     ]
 
     # Add discovery tools from HN MCP (getTopStories, getBestStories, etc.)

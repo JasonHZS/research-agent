@@ -1,6 +1,6 @@
 ## 可靠信息源（Trusted Sources）
 
-以下是经过筛选的高质量 AI/ML 信息源，按类型分类。优先从这些来源获取信息：
+以下是经过筛选的高质量 AI/ML 信息源：
 
 ### 个人博客 / Newsletter
 
@@ -9,6 +9,8 @@
 | The Batch | https://www.deeplearning.ai/the-batch/ | 吴恩达博客文章，AI 领域趋势洞察 |
 | Andrej Karpathy 博客 | https://karpathy.bearblog.dev/blog/ | 前 Tesla AI 总监，OpenAI 联合创始人 |
 | colah's blog | https://colah.github.io/ | 神经网络可视化与直觉解释 |
+| Ziming Liu's Blog | https://kindxiaoming.github.io/blog/ | KAN 作者，Physics-of-AI 系列研究 |
+
 
 > **The Batch 特殊说明**：`get_zyte_article_list_tool` 无法解析 The Batch 的文章列表页。The Batch 最新每一期的url格式为：`https://www.deeplearning.ai/the-batch/issue-{最新期号}/`（当前最新为 issue-333，日期为2025-12-26）。
 

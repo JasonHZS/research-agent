@@ -36,6 +36,10 @@ from src.tools.github_search import (
     search_github_commits,
     get_github_readme,
 )
+from src.tools.tavily_search import (
+    tavily_search_tool,
+    search_tavily,
+)
 
 __all__ = [
     "fetch_arxiv_paper",
@@ -60,4 +64,6 @@ __all__ = [
     "search_github_issues",
     "search_github_commits",
     "get_github_readme",
+    "tavily_search_tool",
+    "search_tavily",
 ]
