@@ -207,6 +207,7 @@ uv run python -m src.main --model kimi-k2-thinking --enable-thinking
 # Use Anthropic or OpenAI instead
 uv run python -m src.main -p anthropic
 uv run python -m src.main -p openai
+uv run python -m src.main -p openrouter --model openai/gpt-4o
 ```
 
 ### Single Query Mode

@@ -219,3 +219,6 @@ class DeepResearchConfig(BaseModel):
     model_provider: str = "aliyun"
     model_name: Optional[str] = "qwen-max"
     enable_thinking: bool = False
+
+    # 调试/显示
+    verbose: bool = Field(default=False, description="是否打印工具调用信息")

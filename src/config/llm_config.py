@@ -14,7 +14,7 @@ import os
 from typing import Mapping, Optional
 
 # Supported providers and defaults
-ALLOWED_PROVIDERS = {"aliyun", "anthropic", "openai"}
+ALLOWED_PROVIDERS = {"aliyun", "anthropic", "openai", "openrouter"}
 DEFAULT_PROVIDER = "aliyun"
 
 

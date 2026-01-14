@@ -199,6 +199,7 @@ async def main_deep_research(
             "allow_clarification": allow_clarification,
             "model_provider": model_provider,
             "model_name": model_name,
+            "verbose": verbose,
         }
     }
 
@@ -311,6 +312,10 @@ async def main(
         sys.exit(1)
     elif resolved_provider == "openai" and not os.getenv("OPENAI_API_KEY"):
         print("Error: OPENAI_API_KEY environment variable not set")
+        print("Please set it in your .env file or environment")
+        sys.exit(1)
+    elif resolved_provider == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
+        print("Error: OPENROUTER_API_KEY environment variable not set")
         print("Please set it in your .env file or environment")
         sys.exit(1)
 
@@ -461,7 +466,7 @@ def run_cli() -> None:
         "-p", "--model-provider",
         type=str,
         default=None,
-        choices=["aliyun", "anthropic", "openai"],
+        choices=["aliyun", "anthropic", "openai", "openrouter"],
         help="LLM provider to use (default: env MODEL_PROVIDER or 'aliyun')",
     )
     parser.add_argument(

@@ -205,7 +205,9 @@ class ReviewResult(BaseModel):
     """
 
     is_sufficient: bool = Field(description="信息是否充足，可以生成报告")
-    overall_score: int = Field(ge=1, le=10, description="整体评分 (1-10)")
+    overall_score: Literal[
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+    ] = Field(description="整体评分 (1-10)")
     section_coverage: list[SectionCoverage] = Field(
         description="各章节覆盖度评估"
     )

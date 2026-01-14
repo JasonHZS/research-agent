@@ -16,6 +16,7 @@ from src.prompts import load_prompt
 
 from ..state import DeepResearchConfig, ResearcherOutputState, ResearcherState, Section
 from ..structured_outputs import SectionContent, get_researcher_tools
+from ..utils.display import render_tool_calls
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
 
@@ -32,6 +33,7 @@ def _get_config(config: RunnableConfig) -> DeepResearchConfig:
         model_name=configurable.get("model_name"),
         enable_thinking=configurable.get("enable_thinking", False),
         allow_clarification=configurable.get("allow_clarification", True),
+        verbose=configurable.get("verbose", False),
     )
 
 
@@ -80,6 +82,14 @@ async def _researcher_invoke_node(
 
     # 调用 LLM
     response = await llm_with_tools.ainvoke(messages)
+
+    # 打印工具调用（如果 verbose 模式启用）
+    if deep_config.verbose and hasattr(response, "tool_calls") and response.tool_calls:
+        render_tool_calls(
+            tool_calls=response.tool_calls,
+            verbose=deep_config.verbose,
+            section_title=section_title,
+        )
 
     return {
         "researcher_messages": [response],

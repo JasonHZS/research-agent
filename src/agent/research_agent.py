@@ -18,14 +18,12 @@ Multi-turn Conversation Support:
 - Pass thread_id in config to maintain conversation context across turns
 """
 
-import os
 from collections.abc import AsyncGenerator
 from datetime import date
 from typing import Any, Optional
 
 from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
-from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.store.base import BaseStore
 
@@ -34,24 +32,16 @@ from src.agent.subagents import (
     get_main_agent_tools,
 )
 from src.config.llm_config import get_model_settings
+from src.config.llm_factory import create_llm
 from src.config.reader_config import get_reader_type
 from src.prompts import load_prompt
 from src.tools.arxiv_api import get_arxiv_paper_tool, search_arxiv_papers_tool
-from src.tools.hf_blog import get_huggingface_blog_posts_tool
-from src.tools.hf_daily_papers import get_huggingface_papers_tool
-from src.tools.zyte_reader import get_zyte_article_list_tool
 from src.tools.bocha_search import bocha_web_search_tool
 from src.tools.github_search import github_search_tool
+from src.tools.hf_blog import get_huggingface_blog_posts_tool
+from src.tools.hf_daily_papers import get_huggingface_papers_tool
 from src.tools.tavily_search import tavily_search_tool
-
-# Available models on Aliyun DashScope
-ALIYUN_MODELS = {
-    "qwen-max": "qwen-max",
-    "kimi-k2-thinking": "kimi-k2-thinking",
-    "deepseek-v3.2": "deepseek-v3.2",
-}
-
-DEFAULT_ALIYUN_MODEL = "qwen-max"
+from src.tools.zyte_reader import get_zyte_article_list_tool
 
 
 def _get_model_config(
@@ -62,58 +52,27 @@ def _get_model_config(
     """
     Get model configuration for the specified provider.
 
+    For providers with custom endpoints (aliyun, openrouter), returns a ChatOpenAI
+    instance in the 'model' key. For standard providers (anthropic, openai), returns
+    just the model name string, which deepagents will use to create the model.
+
     Args:
-        model_provider: One of 'aliyun', 'anthropic', or 'openai'.
+        model_provider: One of 'aliyun', 'anthropic', 'openai', or 'openrouter'.
         model_name: Specific model name.
         enable_thinking: Whether to enable thinking mode (only supported by some models
-                        like qwen-max,DeepSeek-v3.2, kimi-k2-thinking via DashScope).
+                        like qwen-max, DeepSeek-v3.2, kimi-k2-thinking via DashScope).
 
     Returns:
         Dictionary with model configuration for deepagents.
-        For providers with custom endpoints (aliyun), returns a ChatOpenAI instance
-        in the 'model' key. For standard providers, returns just the model name.
     """
-    if model_provider == "aliyun":
-        base_url = os.getenv(
-            "ALIYUN_API_BASE_URL",
-            "https://dashscope.aliyuncs.com/compatible-mode/v1"
-        )
-        api_key = os.getenv("ALIYUN_API_KEY") or os.getenv("DASHSCOPE_API_KEY")
-
-        if not api_key:
-            raise ValueError(
-                "ALIYUN_API_KEY or DASHSCOPE_API_KEY environment variable not set"
-            )
-
-        resolved_model = model_name
-        if model_name in ALIYUN_MODELS:
-            resolved_model = ALIYUN_MODELS[model_name]
-        elif model_name is None:
-            resolved_model = ALIYUN_MODELS[DEFAULT_ALIYUN_MODEL]
-
-        # Build extra_body for enable_thinking support
-        extra_body = {"enable_thinking": True} if enable_thinking else None
-
-        # Create ChatOpenAI instance for custom API endpoints
-        # deepagents' create_deep_agent accepts BaseChatModel directly
-        # streaming=True ensures the underlying API call uses stream=True
-        # which is required for token-level streaming output
-        llm = ChatOpenAI(
-            model=resolved_model,
-            api_key=api_key,
-            base_url=base_url,
-            extra_body=extra_body,
-            streaming=True,
-        )
+    if model_provider in ("aliyun", "openrouter"):
+        # Providers with custom endpoints need LLM instance
+        llm = create_llm(model_provider, model_name, enable_thinking)
         return {"model": llm}
     elif model_provider == "anthropic":
-        return {
-            "model": model_name or "claude-sonnet-4-20250514",
-        }
+        return {"model": model_name or "claude-sonnet-4-20250514"}
     elif model_provider == "openai":
-        return {
-            "model": model_name or "gpt-4o",
-        }
+        return {"model": model_name or "gpt-4o"}
     else:
         raise ValueError(f"Unknown model provider: {model_provider}")
 
@@ -154,7 +113,7 @@ def create_research_agent(
 
     Args:
         hn_mcp_tools: Hacker News MCP tools (will be split between main/sub agent).
-        model_provider: LLM provider ('anthropic', 'openai', or 'aliyun').
+        model_provider: LLM provider ('aliyun', 'anthropic', 'openai', or 'openrouter').
                         Resolved via CLI/env/defaults using llm_config when not set.
         model_name: Specific model to use. Resolved via CLI/env/defaults when not set.
         system_prompt: Custom system prompt. If provided, overrides prompt_template.
@@ -228,7 +187,9 @@ def create_research_agent(
     resolved_enable_thinking = model_settings["enable_thinking"]
 
     # Get model configuration
-    model_config = _get_model_config(resolved_provider, resolved_model_name, resolved_enable_thinking)
+    model_config = _get_model_config(
+        resolved_provider, resolved_model_name, resolved_enable_thinking
+    )
 
     # Load the system prompt from template with reader type and current date
     if system_prompt is None:
@@ -246,8 +207,7 @@ def create_research_agent(
     backend = None
     if store is not None:
         backend = lambda rt: CompositeBackend(
-            default=StateBackend(rt),
-            routes={"/memories/": StoreBackend(rt)}
+            default=StateBackend(rt), routes={"/memories/": StoreBackend(rt)}
         )
 
     # Create the deep agent with tools, subagents, and persistence
@@ -289,7 +249,7 @@ def run_research(
     Args:
         query: The research question or topic to investigate.
         hn_mcp_tools: Hacker News MCP tools for web content.
-        model_provider: LLM provider to use ('anthropic', 'openai', or 'aliyun').
+        model_provider: LLM provider to use ('aliyun', 'anthropic', 'openai', or 'openrouter').
                         Resolved via CLI/env/defaults when not set.
         model_name: Specific model name. Resolved via CLI/env/defaults when not set.
         agent: Pre-created agent instance (for multi-turn conversations).
@@ -342,7 +302,7 @@ async def run_research_async(
     Args:
         query: The research question or topic to investigate.
         hn_mcp_tools: Hacker News MCP tools for web content.
-        model_provider: LLM provider to use ('anthropic', 'openai', or 'aliyun').
+        model_provider: LLM provider to use ('aliyun', 'anthropic', 'openai', or 'openrouter').
                         Resolved via CLI/env/defaults when not set.
         model_name: Specific model name. Resolved via CLI/env/defaults when not set.
         agent: Pre-created agent instance (for multi-turn conversations).
