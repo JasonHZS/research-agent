@@ -18,6 +18,7 @@ from langchain_openai import ChatOpenAI
 # Aliyun DashScope 模型映射
 ALIYUN_MODELS = {
     "qwen-max": "qwen-max",
+    "qwen3-max": "qwen3-max",
     "kimi-k2-thinking": "kimi-k2-thinking",
     "deepseek-v3.2": "deepseek-v3.2",
 }
