@@ -36,7 +36,7 @@ def _get_bocha_api_key(api_key: Optional[str] = None) -> str:
 
 def search_web(
     query: str,
-    count: int = 5,
+    count: int = 10,
     summary: bool = True,
     api_key: Optional[str] = None,
 ) -> list[SearchResult]:
@@ -147,7 +147,7 @@ def _handle_request_error(e: requests.RequestException, query: str) -> str:
 
 
 @tool
-def bocha_web_search_tool(query: str, count: int = 5) -> str:
+def bocha_web_search_tool(query: str, count: int = 10) -> str:
     """
     Perform a general web search using the Bocha Search API.
 

@@ -2,13 +2,20 @@
 Clarify With User Node
 
 分析用户查询，判断是否需要澄清。
-使用结构化输出进行决策，通过 Command API 控制流转移。
+简化设计：单节点内完成工具调用和澄清判断。
+通过 Command API 控制流转移。
 """
 
 from datetime import datetime
 from typing import Literal
 
-from langchain_core.messages import AIMessage, HumanMessage, get_buffer_string
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+    get_buffer_string,
+)
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END
 from langgraph.types import Command
@@ -36,12 +43,21 @@ def _get_config(config: RunnableConfig) -> DeepResearchConfig:
     )
 
 
+def _get_clarify_tools() -> list:
+    """获取澄清阶段可用的搜索工具。"""
+    from src.tools.bocha_search import bocha_web_search_tool
+
+    return [bocha_web_search_tool]
+
+
 async def clarify_with_user_node(
     state: AgentState,
     config: RunnableConfig,
 ) -> Command[Literal["analyze", "__end__"]]:
     """
     分析用户查询，决定是否需要澄清。
+
+    简化设计：单节点内完成工具调用和澄清判断。
 
     使用 Command API 控制流转移：
     - 如果需要澄清：goto=END，将澄清问题作为 AIMessage 添加到 messages
@@ -59,7 +75,6 @@ async def clarify_with_user_node(
     messages = get_state_value(state, "messages", [])
 
     # 从 messages 中提取用户的完整意图作为 original_query
-    # 包含所有用户消息（初始查询 + 澄清回答）
     user_messages = [m.content for m in messages if isinstance(m, HumanMessage)]
     original_query = "\n".join(user_messages) if user_messages else ""
 
@@ -70,22 +85,81 @@ async def clarify_with_user_node(
             update={"original_query": original_query},
         )
 
-    # 获取带结构化输出的 LLM
+    # 获取工具和 LLM
+    tools = _get_clarify_tools()
     llm = get_llm(deep_config.model_provider, deep_config.model_name)
-    llm_with_output = llm.with_structured_output(ClarifyWithUser)
+    llm_with_tools = llm.bind_tools(tools)
 
-    # 获取当前日期
     current_date = datetime.now().strftime("%Y-%m-%d")
 
-    # 加载提示并调用（使用 get_buffer_string 格式化完整消息历史）
-    prompt_text = load_prompt(
+    # 构建系统提示（角色设定、行为准则）
+    system_prompt = load_prompt(
         "deep_research/clarify",
         query=get_buffer_string(messages),
         current_date=current_date,
     )
 
-    result: ClarifyWithUser = await llm_with_output.ainvoke(prompt_text)
-    print("\n[ClarifyWithUser]:", result.verification)
+    # 工具调用循环（最多 2 轮）
+    search_context = ""
+    max_iterations = 2
+    tool_messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(
+            content="请分析用户查询，判断是否需要澄清。如需实时信息可使用搜索工具。"
+        ),
+    ]
+
+    for i in range(max_iterations):
+        response = await llm_with_tools.ainvoke(tool_messages)
+
+        if not response.tool_calls:
+            break
+
+        # 执行工具调用
+        tool_results = []
+        for tool_call in response.tool_calls:
+            tool = next((t for t in tools if t.name == tool_call["name"]), None)
+            if tool:
+                print(f"  [Clarify] 执行搜索: {tool_call['args'].get('query', '')}")
+                result = await tool.ainvoke(tool_call["args"])
+                tool_results.append(
+                    ToolMessage(
+                        content=result,
+                        tool_call_id=tool_call["id"],
+                    )
+                )
+                search_context += result + "\n\n"
+
+        # 追加到消息历史
+        tool_messages.append(response)
+        tool_messages.extend(tool_results)
+
+        print(f"  [Clarify] 搜索迭代 {i + 1}/{max_iterations} 完成")
+
+    # 使用结构化输出提取最终决策（直接传字符串，和原版一致）
+    final_prompt = load_prompt(
+        "deep_research/clarify",
+        query=get_buffer_string(messages),
+        current_date=current_date,
+        search_context=search_context,
+    )
+
+    try:
+        llm_structured = llm.with_structured_output(ClarifyWithUser)
+        result: ClarifyWithUser = await llm_structured.ainvoke(final_prompt)
+    except Exception as e:
+        # 回退：默认不需要澄清
+        print(f"  [Clarify] 结果提取失败: {e}")
+        result = ClarifyWithUser(
+            need_clarification=False,
+            question="",
+            verification="了解，我现在开始为您进行深度研究。",
+        )
+
+    print(
+        f"\n[ClarifyWithUser]: "
+        f"{result.verification if not result.need_clarification else result.question}"
+    )
 
     if result.need_clarification:
         # 需要澄清：中断并等待用户响应
@@ -98,7 +172,6 @@ async def clarify_with_user_node(
         )
     else:
         # 不需要澄清：继续进入 analyze（查询分析节点）
-        # 设置 original_query 供后续节点使用
         return Command(
             goto="analyze",
             update={
