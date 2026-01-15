@@ -38,6 +38,50 @@ interface MessageActionsProps {
   fallbackContent?: string;
 }
 
+/**
+ * User message bubble with copy button on hover
+ */
+interface UserMessageBubbleProps {
+  content: string;
+}
+
+const UserMessageBubble = memo(function UserMessageBubble({ content }: UserMessageBubbleProps) {
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!content) return;
+    await navigator.clipboard.writeText(content);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  }, [content]);
+
+  return (
+    <div className="group relative">
+      <div className="rounded-2xl px-4 py-2.5 bg-primary text-primary-foreground rounded-br-md break-words">
+        <p className="whitespace-pre-wrap">{content}</p>
+      </div>
+      {/* Copy button - appears on hover */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn(
+          'absolute -left-8 top-1/2 -translate-y-1/2 h-6 w-6 rounded-md',
+          'text-muted-foreground hover:bg-muted',
+          'opacity-0 group-hover:opacity-100 transition-opacity'
+        )}
+        onClick={handleCopy}
+        title="复制消息"
+      >
+        {isCopied ? (
+          <Check className="h-3.5 w-3.5 text-green-500" />
+        ) : (
+          <Copy className="h-3.5 w-3.5" />
+        )}
+      </Button>
+    </div>
+  );
+});
+
 const MessageActions = memo(function MessageActions({ 
   segments, 
   fallbackContent 
@@ -99,7 +143,7 @@ const SegmentRenderer = memo(function SegmentRenderer({
         <MarkdownRenderer content={segment.content} />
         {/* Blinking cursor - inline at end of text */}
         {showCursor && (
-          <span className="inline-block w-2 h-4 bg-foreground/70 ml-0.5 cursor-blink" />
+          <span className="inline-block w-2 h-4 bg-primary ml-0.5 cursor-blink" />
         )}
       </div>
     </div>
@@ -112,7 +156,7 @@ const SegmentRenderer = memo(function SegmentRenderer({
 const StreamingCursor = memo(function StreamingCursor() {
   return (
     <div className="w-full">
-      <span className="inline-block w-2 h-4 bg-foreground/70 cursor-blink" />
+      <span className="inline-block w-2 h-4 bg-primary cursor-blink" />
     </div>
   );
 });
@@ -162,7 +206,7 @@ export const MessageBubble = memo(function MessageBubble({
               <div className="prose-container">
                 <MarkdownRenderer content={message.content} />
                 {isStreaming && (
-                  <span className="inline-block w-2 h-4 bg-foreground/70 ml-0.5 cursor-blink" />
+                  <span className="inline-block w-2 h-4 bg-primary ml-0.5 cursor-blink" />
                 )}
               </div>
             </div>
@@ -171,9 +215,7 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* User message bubble */}
         {isUser && (
-          <div className="rounded-2xl px-4 py-2.5 bg-primary text-primary-foreground rounded-br-md break-words">
-            <p className="whitespace-pre-wrap">{message.content}</p>
-          </div>
+          <UserMessageBubble content={message.content} />
         )}
 
         {/* Message Actions (Copy) - Only for assistant messages */}
@@ -266,7 +308,7 @@ export const StreamingMessageBubble = memo(function StreamingMessageBubble({
                     <span className="text-muted-foreground">Generating response...</span>
                   )}
                   {/* Blinking cursor */}
-                  <span className="inline-block w-2 h-4 bg-foreground/70 ml-0.5 cursor-blink" />
+                  <span className="inline-block w-2 h-4 bg-primary ml-0.5 cursor-blink" />
                 </div>
               </div>
             )}

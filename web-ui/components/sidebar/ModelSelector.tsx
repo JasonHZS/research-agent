@@ -97,7 +97,11 @@ export const ModelSelector = memo(function ModelSelector({
         <Button
           variant={buttonVariant}
           size={buttonSize}
-          className={cn(fullWidth ? 'w-full justify-between' : 'justify-between', className)}
+          className={cn(
+            fullWidth ? 'w-full justify-between' : 'justify-between',
+            'focus-visible:ring-0 focus-visible:ring-offset-0',
+            className
+          )}
         >
           <div className="flex items-center gap-2 truncate">
             <ProviderIcon className="h-4 w-4 shrink-0" />

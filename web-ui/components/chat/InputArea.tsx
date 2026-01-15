@@ -67,8 +67,8 @@ export function InputArea({
 
   return (
     <div className={cn('bg-background p-4', className)}>
-      <div className="max-w-5xl mx-auto">
-        <div className="relative flex items-end gap-2 bg-card border border-border rounded-2xl px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+      <div className="max-w-3xl mx-auto">
+        <div className="relative flex items-end gap-2 bg-card border border-border rounded-2xl px-4 py-2 shadow-sm transition-shadow duration-300 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.4),0_0_40px_hsl(var(--primary)/0.2)] focus-within:border-primary/50">
           {/* Input textarea */}
           <textarea
             ref={textareaRef}
