@@ -26,6 +26,12 @@ class ChatStreamRequest(BaseModel):
     model_name: str = "qwen-max"
 
 
+class ChatResetRequest(BaseModel):
+    """Request body for resetting a chat session."""
+
+    session_id: str
+
+
 @router.post("/stream")
 async def stream_chat(request: ChatStreamRequest) -> StreamingResponse:
     """
@@ -83,3 +89,11 @@ async def stream_chat(request: ChatStreamRequest) -> StreamingResponse:
             "X-Accel-Buffering": "no",  # Disable Nginx buffering
         },
     )
+
+
+@router.post("/reset")
+async def reset_chat(request: ChatResetRequest) -> dict[str, str]:
+    """Reset a chat session and clear any cached state."""
+    agent_service = get_agent_service()
+    agent_service.remove_agent(request.session_id)
+    return {"status": "ok"}

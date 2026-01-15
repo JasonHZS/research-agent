@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { api } from '@/lib/api';
 import type { ChatMessage, ModelInfo, ToolCall, MessageSegment } from '@/lib/types';
-import { generateId, getSessionId, resetSessionId } from '@/lib/utils';
+import { generateId, getStoredSessionId, resetSessionId } from '@/lib/utils';
 
 /**
  * Message state for streaming responses
@@ -23,7 +23,7 @@ export interface StreamingMessage {
  * Chat state interface (simplified - no conversation persistence)
  */
 interface ChatState {
-  // Session (ephemeral - stored in sessionStorage only)
+  // Session (ephemeral per page load; stored in sessionStorage for this tab)
   sessionId: string;
   currentMessages: ChatMessage[];
 
@@ -70,14 +70,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  // Initialize session from sessionStorage
+  // Initialize session on page load, clearing any stale backend state
   initSession: () => {
-    const sessionId = getSessionId();
-    set({ sessionId });
+    const { sessionId: currentSessionId } = get();
+    if (currentSessionId) {
+      return;
+    }
+
+    const existingSessionId = getStoredSessionId();
+    if (existingSessionId) {
+      void api.resetSession(existingSessionId).catch((error) => {
+        console.warn('Failed to reset session:', error);
+      });
+    }
+
+    const sessionId = resetSessionId();
+    set({
+      sessionId,
+      currentMessages: [],
+      streamingMessage: null,
+      error: null,
+    });
   },
 
   // Start a new chat (reset session)
   newChat: () => {
+    const { sessionId } = get();
+    if (sessionId) {
+      void api.resetSession(sessionId).catch((error) => {
+        console.warn('Failed to reset session:', error);
+      });
+    }
+
     const newSessionId = resetSessionId();
     set({
       sessionId: newSessionId,
