@@ -23,7 +23,7 @@ from src.api.schemas.chat import (
     ToolCall,
     ToolCallStatus,
 )
-from src.config.llm_factory import ALIYUN_MODELS
+from src.config.llm_factory import ALIYUN_MODELS, OPENROUTER_MODELS
 
 
 class AgentService:
@@ -334,14 +334,17 @@ class AgentService:
             )
 
         # OpenRouter models
-        models.append(
-            ModelInfo(
-                provider="openrouter",
-                name="anthropic/claude-sonnet-4.5",
-                display_name="Claude Sonnet 4.5 (OpenRouter)",
-                supports_thinking=False,
+        for alias, full_name in OPENROUTER_MODELS.items():
+            # 从完整模型名提取显示名称，如 "openai/gpt-5" -> "GPT-5"
+            model_display = full_name.split("/")[-1]
+            models.append(
+                ModelInfo(
+                    provider="openrouter",
+                    name=full_name,
+                    display_name=f"{model_display} (OpenRouter)",
+                    supports_thinking=False,
+                )
             )
-        )
 
         return models
 

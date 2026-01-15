@@ -72,7 +72,7 @@ function ToolCallItem({ toolCall }: ToolCallItemProps) {
         <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
 
         <div className="flex-1 min-w-0 flex items-center gap-2">
-          <span className="font-medium truncate">{toolCall.name}</span>
+          <span className="font-medium shrink-0">{toolCall.name}</span>
           {!isOpen && argsString && (
             <span className="text-muted-foreground truncate opacity-70 text-xs font-mono">
               ({argsString})

@@ -179,7 +179,7 @@ export function ChatContainer() {
         {!hasMessages ? (
           // Empty State: Centered Layout
           <div className="flex-1 flex flex-col justify-center pb-[10vh]">
-            <div className="w-full max-w-5xl mx-auto px-4 mb-8">
+            <div className="w-full max-w-3xl mx-auto px-4 mb-8">
               <div className="flex flex-col items-center justify-center text-center">
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                   <Sun className="w-8 h-8 text-primary animate-[spin_12s_linear_infinite]" />
