@@ -1,20 +1,27 @@
 """Agent service - Bridge between API and research agent."""
 
-import uuid
+import asyncio
 from collections.abc import AsyncGenerator
 from typing import Any, Optional
+
+import httpcore
+import httpx
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 
-from src.agent.research_agent import create_research_agent, run_research_stream
+from src.agent.research_agent import (
+    create_research_agent,
+    run_research_async,
+    run_research_stream,
+)
 from src.api.schemas.chat import (
     ModelInfo,
+    StreamEvent,
+    StreamEventType,
     ToolCall,
     ToolCallStatus,
-    WebSocketEvent,
-    WebSocketEventType,
 )
 from src.config.llm_factory import ALIYUN_MODELS
 
@@ -93,22 +100,59 @@ class AgentService:
         self._stores.pop(conversation_id, None)
         self._agent_configs.pop(conversation_id, None)
 
+    @staticmethod
+    def _is_stream_disconnect_error(exc: Exception) -> bool:
+        """Return True when upstream closes streaming response early."""
+        if isinstance(exc, (httpx.RemoteProtocolError, httpcore.RemoteProtocolError)):
+            return True
+
+        message = str(exc).lower()
+        if "incomplete chunked read" in message or "peer closed connection" in message:
+            return True
+
+        cause = getattr(exc, "__cause__", None)
+        if cause and isinstance(cause, (httpx.RemoteProtocolError, httpcore.RemoteProtocolError)):
+            return True
+
+        return False
+
     async def stream_response(
         self,
         conversation_id: str,
         message: str,
         model_provider: str = "aliyun",
         model_name: Optional[str] = None,
-    ) -> AsyncGenerator[WebSocketEvent, None]:
+    ) -> AsyncGenerator[StreamEvent, None]:
         """
-        Stream agent response as WebSocket events.
+        Stream agent response as events.
 
-        Yields WebSocketEvent objects that can be serialized and sent to clients.
+        Yields StreamEvent objects that can be serialized and sent to clients.
+        Each request is independent - no cross-request state tracking needed.
         """
         agent = self._get_or_create_agent(conversation_id, model_provider, model_name)
 
-        # Track tool calls for this response
+        # Get existing tool call IDs from checkpoint BEFORE streaming
+        # This prevents historical tool calls from being sent as new ones
+        config = {"configurable": {"thread_id": conversation_id}}
+        existing_tool_ids: set[str] = set()
+        try:
+            state = agent.get_state(config)
+            if state and state.values:
+                for msg in state.values.get("messages", []):
+                    if hasattr(msg, "tool_calls") and msg.tool_calls:
+                        for tc in msg.tool_calls:
+                            tool_id = tc.get("id", "")
+                            if tool_id:
+                                existing_tool_ids.add(tool_id)
+            if existing_tool_ids:
+                print(f"Found {len(existing_tool_ids)} existing tool calls in checkpoint")
+        except Exception as e:
+            # Graceful fallback if state retrieval fails
+            print(f"Warning: Could not retrieve checkpoint state: {e}")
+
+        # Track tool calls for this response only
         active_tool_calls: dict[str, ToolCall] = {}
+        seen_tool_ids: set[str] = existing_tool_ids.copy()  # Start with existing IDs
         tool_call_counter = 0
 
         try:
@@ -128,8 +172,8 @@ class AgentService:
                         content = message_chunk.content
                         # Handle string content
                         if isinstance(content, str) and content:
-                            yield WebSocketEvent(
-                                type=WebSocketEventType.TOKEN,
+                            yield StreamEvent(
+                                type=StreamEventType.TOKEN,
                                 data={"content": content},
                             )
                         # Handle list content (e.g., thinking blocks)
@@ -137,13 +181,13 @@ class AgentService:
                             for item in content:
                                 if isinstance(item, dict):
                                     if item.get("type") == "thinking":
-                                        yield WebSocketEvent(
-                                            type=WebSocketEventType.THINKING,
+                                        yield StreamEvent(
+                                            type=StreamEventType.THINKING,
                                             data={"content": item.get("thinking", "")},
                                         )
                                     elif item.get("type") == "text":
-                                        yield WebSocketEvent(
-                                            type=WebSocketEventType.TOKEN,
+                                        yield StreamEvent(
+                                            type=StreamEventType.TOKEN,
                                             data={"content": item.get("text", "")},
                                         )
 
@@ -154,20 +198,26 @@ class AgentService:
                             continue
 
                         messages = node_data.get("messages", [])
-                        
+
                         # Handle LangGraph's Overwrite object
                         if hasattr(messages, "value"):
                             messages = messages.value
-                        
+
                         # Ensure messages is iterable
                         if not isinstance(messages, (list, tuple)):
                             continue
-                            
+
                         for msg in messages:
                             # Check for tool calls in AI messages
                             if hasattr(msg, "tool_calls") and msg.tool_calls:
                                 for tc in msg.tool_calls:
                                     tool_id = tc.get("id", f"tc_{tool_call_counter}")
+                                    
+                                    # Skip duplicates within this request
+                                    if tool_id in seen_tool_ids:
+                                        continue
+                                    
+                                    seen_tool_ids.add(tool_id)
                                     tool_call_counter += 1
 
                                     tool_call = ToolCall(
@@ -178,8 +228,8 @@ class AgentService:
                                     )
                                     active_tool_calls[tool_id] = tool_call
 
-                                    yield WebSocketEvent(
-                                        type=WebSocketEventType.TOOL_CALL_START,
+                                    yield StreamEvent(
+                                        type=StreamEventType.TOOL_CALL_START,
                                         data=tool_call.model_dump(),
                                     )
 
@@ -193,14 +243,14 @@ class AgentService:
                                         msg.content[:500] if msg.content else ""
                                     )  # Truncate for display
 
-                                    yield WebSocketEvent(
-                                        type=WebSocketEventType.TOOL_CALL_END,
+                                    yield StreamEvent(
+                                        type=StreamEventType.TOOL_CALL_END,
                                         data=tool_call.model_dump(),
                                     )
 
             # Signal completion
-            yield WebSocketEvent(
-                type=WebSocketEventType.MESSAGE_COMPLETE,
+            yield StreamEvent(
+                type=StreamEventType.MESSAGE_COMPLETE,
                 data={
                     "tool_calls": [tc.model_dump() for tc in active_tool_calls.values()]
                 },
@@ -208,10 +258,63 @@ class AgentService:
 
         except Exception as e:
             import traceback
+
+            if self._is_stream_disconnect_error(e):
+                print(
+                    "WARNING: Streaming connection closed early; "
+                    "retrying with non-streaming response."
+                )
+                
+                # Retry with exponential backoff for transient connection errors
+                max_retries = 3
+                base_delay = 1.0  # seconds
+                
+                for attempt in range(max_retries):
+                    try:
+                        if attempt > 0:
+                            delay = base_delay * (2 ** (attempt - 1))  # 1s, 2s, 4s
+                            print(f"Retry attempt {attempt + 1}/{max_retries} after {delay}s delay...")
+                            await asyncio.sleep(delay)
+                        
+                        final_text = await run_research_async(
+                            query=message,
+                            agent=agent,
+                            thread_id=conversation_id,
+                        )
+                        if final_text:
+                            yield StreamEvent(
+                                type=StreamEventType.TOKEN,
+                                data={"content": final_text},
+                            )
+                        yield StreamEvent(
+                            type=StreamEventType.MESSAGE_COMPLETE,
+                            data={
+                                "tool_calls": [
+                                    tc.model_dump()
+                                    for tc in active_tool_calls.values()
+                                ]
+                            },
+                        )
+                        return  # Success, exit retry loop
+                        
+                    except Exception as fallback_error:
+                        is_retryable = self._is_stream_disconnect_error(fallback_error)
+                        
+                        if is_retryable and attempt < max_retries - 1:
+                            print(f"Retry {attempt + 1} failed with retryable error: {fallback_error}")
+                            continue  # Try again
+                        
+                        # Final attempt failed or non-retryable error
+                        error_msg = (
+                            f"{str(fallback_error)}\n{traceback.format_exc()}"
+                        )
+                        print(f"ERROR in non-streaming fallback (attempt {attempt + 1}): {error_msg}")
+                        break  # Exit retry loop, fall through to error handling
+
             error_msg = f"{str(e)}\n{traceback.format_exc()}"
             print(f"ERROR in agent stream: {error_msg}")
-            yield WebSocketEvent(
-                type=WebSocketEventType.ERROR,
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
                 data={"message": str(e)},
             )
 
@@ -229,26 +332,6 @@ class AgentService:
                     supports_thinking=name in ["qwen-max", "qwen3-max", "kimi-k2-thinking", "deepseek-v3.2"],
                 )
             )
-
-        # Anthropic models
-        # models.append(
-        #     ModelInfo(
-        #         provider="anthropic",
-        #         name="claude-sonnet-4-20250514",
-        #         display_name="Claude Sonnet 4",
-        #         supports_thinking=False,
-        #     )
-        # )
-
-        # OpenAI models
-        # models.append(
-        #     ModelInfo(
-        #         provider="openai",
-        #         name="gpt-4o",
-        #         display_name="GPT-4o",
-        #         supports_thinking=False,
-        #     )
-        # )
 
         # OpenRouter models
         models.append(

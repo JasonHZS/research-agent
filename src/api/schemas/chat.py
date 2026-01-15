@@ -90,8 +90,8 @@ class Conversation(BaseModel):
     updated_at: datetime
 
 
-class WebSocketEventType(str, Enum):
-    """Types of WebSocket events."""
+class StreamEventType(str, Enum):
+    """Types of streaming events (transport-agnostic)."""
 
     TOKEN = "token"
     TOOL_CALL_START = "tool_call_start"
@@ -101,11 +101,16 @@ class WebSocketEventType(str, Enum):
     THINKING = "thinking"
 
 
-class WebSocketEvent(BaseModel):
-    """WebSocket event message."""
+class StreamEvent(BaseModel):
+    """Streaming event message (transport-agnostic)."""
 
-    type: WebSocketEventType
+    type: StreamEventType
     data: Any = None
+
+
+# Backward compatibility aliases
+WebSocketEventType = StreamEventType
+WebSocketEvent = StreamEvent
 
 
 class ModelInfo(BaseModel):

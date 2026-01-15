@@ -1,23 +1,30 @@
 'use client';
 
 import { create } from 'zustand';
-import { api, type ChatMessage, type ConversationSummary, type ModelInfo, type ToolCall } from '@/lib/api';
-import { generateId } from '@/lib/utils';
+import { api } from '@/lib/api';
+import type { ChatMessage, ModelInfo, ToolCall, MessageSegment } from '@/lib/types';
+import { generateId, getSessionId, resetSessionId } from '@/lib/utils';
 
-// Message state for streaming
+/**
+ * Message state for streaming responses
+ */
 export interface StreamingMessage {
   id: string;
   role: 'assistant';
   content: string;
   toolCalls: ToolCall[];
+  /** Segments for interleaved display of tool calls and text */
+  segments: MessageSegment[];
   isStreaming: boolean;
   thinkingContent?: string;
 }
 
+/**
+ * Chat state interface (simplified - no conversation persistence)
+ */
 interface ChatState {
-  // Conversations
-  conversations: ConversationSummary[];
-  currentConversationId: string | null;
+  // Session (ephemeral - stored in sessionStorage only)
+  sessionId: string;
   currentMessages: ChatMessage[];
 
   // Models
@@ -32,31 +39,29 @@ interface ChatState {
   isLoading: boolean;
   error: string | null;
 
-  // Actions
-  loadConversations: () => Promise<void>;
-  loadConversation: (id: string) => Promise<void>;
-  createConversation: (title?: string) => Promise<string>;
-  deleteConversation: (id: string) => Promise<void>;
-  setCurrentConversation: (id: string) => void;
+  // Session actions
+  initSession: () => void;
+  newChat: () => void;
 
+  // Model actions
   loadModels: () => Promise<void>;
   setModel: (provider: string, name: string) => void;
 
   // Message handling
   addUserMessage: (content: string) => void;
-  startStreaming: () => void;
+  startStreaming: (requestId: string) => void;
   appendToken: (content: string) => void;
   appendThinking: (content: string) => void;
   addToolCallStart: (toolCall: ToolCall) => void;
   updateToolCallEnd: (toolCall: ToolCall) => void;
   finishStreaming: () => void;
   setError: (error: string | null) => void;
+  clearMessages: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
   // Initial state
-  conversations: [],
-  currentConversationId: null,
+  sessionId: '',
   currentMessages: [],
   models: [],
   currentModelProvider: 'aliyun',
@@ -65,93 +70,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  // Load all conversations
-  loadConversations: async () => {
-    try {
-      set({ isLoading: true, error: null });
-      const conversations = await api.getConversations();
-      set({ conversations, isLoading: false });
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to load conversations',
-        isLoading: false,
-      });
-    }
+  // Initialize session from sessionStorage
+  initSession: () => {
+    const sessionId = getSessionId();
+    set({ sessionId });
   },
 
-  // Load a specific conversation with messages
-  loadConversation: async (id: string) => {
-    try {
-      set({ isLoading: true, error: null });
-      const conversation = await api.getConversation(id);
-      set({
-        currentConversationId: id,
-        currentMessages: conversation.messages,
-        currentModelProvider: conversation.model_provider,
-        currentModelName: conversation.model_name,
-        isLoading: false,
-      });
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to load conversation',
-        isLoading: false,
-      });
-    }
-  },
-
-  // Create a new conversation
-  createConversation: async (title?: string) => {
-    try {
-      set({ isLoading: true, error: null });
-      const { currentModelProvider, currentModelName } = get();
-      const conversation = await api.createConversation({
-        title,
-        model_provider: currentModelProvider,
-        model_name: currentModelName,
-      });
-      const conversations = await api.getConversations();
-      set({
-        conversations,
-        currentConversationId: conversation.id,
-        currentMessages: [],
-        isLoading: false,
-      });
-      return conversation.id;
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to create conversation',
-        isLoading: false,
-      });
-      return '';
-    }
-  },
-
-  // Delete a conversation
-  deleteConversation: async (id: string) => {
-    try {
-      await api.deleteConversation(id);
-      const { currentConversationId, conversations } = get();
-      const newConversations = conversations.filter((c) => c.id !== id);
-      set({ conversations: newConversations });
-
-      // If deleted current conversation, switch to another or create new
-      if (currentConversationId === id) {
-        if (newConversations.length > 0) {
-          get().loadConversation(newConversations[0].id);
-        } else {
-          set({ currentConversationId: null, currentMessages: [] });
-        }
-      }
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to delete conversation',
-      });
-    }
-  },
-
-  // Set current conversation without loading
-  setCurrentConversation: (id: string) => {
-    set({ currentConversationId: id });
+  // Start a new chat (reset session)
+  newChat: () => {
+    const newSessionId = resetSessionId();
+    set({
+      sessionId: newSessionId,
+      currentMessages: [],
+      streamingMessage: null,
+      error: null,
+    });
   },
 
   // Load available models
@@ -187,13 +120,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Start streaming a new assistant message
-  startStreaming: () => {
+  startStreaming: (requestId: string) => {
     set({
       streamingMessage: {
-        id: generateId(),
+        id: requestId,
         role: 'assistant',
         content: '',
         toolCalls: [],
+        segments: [],
         isStreaming: true,
       },
     });
@@ -203,10 +137,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
   appendToken: (content: string) => {
     const { streamingMessage } = get();
     if (streamingMessage) {
+      const segments = [...streamingMessage.segments];
+      const lastSegment = segments[segments.length - 1];
+      
+      // If no segments or last segment is tool_calls, create new text segment
+      if (!lastSegment || lastSegment.type === 'tool_calls') {
+        segments.push({ type: 'text', content });
+      } else {
+        // Append to existing text segment
+        segments[segments.length - 1] = {
+          ...lastSegment,
+          content: lastSegment.content + content,
+        };
+      }
+      
       set({
         streamingMessage: {
           ...streamingMessage,
           content: streamingMessage.content + content,
+          segments,
         },
       });
     }
@@ -229,10 +178,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
   addToolCallStart: (toolCall: ToolCall) => {
     const { streamingMessage } = get();
     if (streamingMessage) {
+      const segments = [...streamingMessage.segments];
+      const lastSegment = segments[segments.length - 1];
+      
+      // Determine if this is a new batch or same batch
+      let shouldCreateNewSegment = true;
+      
+      if (lastSegment?.type === 'tool_calls') {
+        // Check if all tools in the last segment are still running
+        // If so, this is part of the same batch
+        const allRunning = lastSegment.toolCalls.every(tc => tc.status === 'running');
+        if (allRunning) {
+          shouldCreateNewSegment = false;
+        }
+      }
+      
+      if (shouldCreateNewSegment) {
+        // Create new tool_calls segment
+        segments.push({ type: 'tool_calls', toolCalls: [toolCall] });
+      } else {
+        // Append to existing tool_calls segment (same batch)
+        const lastToolCallsSegment = lastSegment as { type: 'tool_calls'; toolCalls: ToolCall[] };
+        segments[segments.length - 1] = {
+          ...lastToolCallsSegment,
+          toolCalls: [...lastToolCallsSegment.toolCalls, toolCall],
+        };
+      }
+      
       set({
         streamingMessage: {
           ...streamingMessage,
           toolCalls: [...streamingMessage.toolCalls, toolCall],
+          segments,
         },
       });
     }
@@ -242,13 +219,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
   updateToolCallEnd: (toolCall: ToolCall) => {
     const { streamingMessage } = get();
     if (streamingMessage) {
+      // Update in flat toolCalls array
       const updatedToolCalls = streamingMessage.toolCalls.map((tc) =>
         tc.id === toolCall.id ? toolCall : tc
       );
+      
+      // Update in segments
+      const updatedSegments = streamingMessage.segments.map((segment) => {
+        if (segment.type === 'tool_calls') {
+          return {
+            ...segment,
+            toolCalls: segment.toolCalls.map((tc) =>
+              tc.id === toolCall.id ? toolCall : tc
+            ),
+          };
+        }
+        return segment;
+      });
+      
       set({
         streamingMessage: {
           ...streamingMessage,
           toolCalls: updatedToolCalls,
+          segments: updatedSegments,
         },
       });
     }
@@ -263,20 +256,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
         role: 'assistant',
         content: streamingMessage.content,
         tool_calls: streamingMessage.toolCalls,
+        segments: streamingMessage.segments,
         created_at: new Date().toISOString(),
       };
       set({
         currentMessages: [...currentMessages, finalMessage],
         streamingMessage: null,
       });
-
-      // Refresh conversation list to update titles
-      get().loadConversations();
     }
   },
 
   // Set error message
   setError: (error: string | null) => {
     set({ error, streamingMessage: null });
+  },
+
+  // Clear all messages (for new chat)
+  clearMessages: () => {
+    set({ currentMessages: [], streamingMessage: null, error: null });
   },
 }));

@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Send, StopCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ModelSelector } from '@/components/sidebar/ModelSelector';
 import { cn } from '@/lib/utils';
 
 interface InputAreaProps {
@@ -30,7 +31,7 @@ export function InputArea({
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 300)}px`;
     }
   }, []);
 
@@ -65,8 +66,8 @@ export function InputArea({
   );
 
   return (
-    <div className={cn('border-t border-border bg-background p-4', className)}>
-      <div className="max-w-3xl mx-auto">
+    <div className={cn('bg-background p-4', className)}>
+      <div className="max-w-5xl mx-auto">
         <div className="relative flex items-end gap-2 bg-card border border-border rounded-2xl px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
           {/* Input textarea */}
           <textarea
@@ -77,7 +78,15 @@ export function InputArea({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="flex-1 resize-none bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground min-h-[24px] max-h-[200px] py-1 scrollbar-thin"
+            className="flex-1 resize-none bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground min-h-[94px] max-h-[300px] py-1 scrollbar-thin"
+          />
+
+          <ModelSelector
+            buttonVariant="ghost"
+            buttonSize="sm"
+            fullWidth={false}
+            align="end"
+            className="h-8 rounded-full px-3 text-xs"
           />
 
           {/* Action button */}

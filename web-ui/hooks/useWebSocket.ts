@@ -1,121 +1,126 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { getWsBaseUrl } from '@/lib/utils';
-import type { WebSocketEvent } from '@/lib/api';
+import { streamChat, type StreamConfig } from '@/lib/stream';
+import type { StreamEvent, StreamingStatus, ToolCall } from '@/lib/types';
 
-export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+export type { StreamingStatus };
 
-interface UseWebSocketOptions {
-  onMessage?: (event: WebSocketEvent) => void;
-  onOpen?: () => void;
-  onClose?: () => void;
-  onError?: (error: Event) => void;
-  reconnectAttempts?: number;
-  reconnectInterval?: number;
+interface UseStreamOptions {
+  onMessage?: (event: StreamEvent) => void;
+  onError?: (error: string) => void;
 }
 
-export function useWebSocket(options: UseWebSocketOptions = {}) {
-  const {
-    onMessage,
-    onOpen,
-    onClose,
-    onError,
-    reconnectAttempts = 3,
-    reconnectInterval = 2000,
-  } = options;
+/**
+ * Hook for managing SSE stream requests (per-request model)
+ *
+ * Unlike WebSocket, each message creates a new HTTP request.
+ * No persistent connection management needed.
+ */
+export function useStream(options: UseStreamOptions = {}) {
+  const { onMessage, onError } = options;
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectCountRef = useRef(0);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-
-  const [status, setStatus] = useState<ConnectionStatus>('disconnected');
+  const [status, setStatus] = useState<StreamingStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const cleanup = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-    if (wsRef.current) {
-      wsRef.current.onopen = null;
-      wsRef.current.onclose = null;
-      wsRef.current.onerror = null;
-      wsRef.current.onmessage = null;
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-  }, []);
+  // Use refs for callbacks to avoid stale closures
+  const callbacksRef = useRef({ onMessage, onError });
+  callbacksRef.current = { onMessage, onError };
 
-  const connect = useCallback(
-    (conversationId: string) => {
-      cleanup();
-      setStatus('connecting');
+  /**
+   * Send a message and stream the response
+   */
+  const sendMessage = useCallback(
+    async (
+      sessionId: string,
+      message: string,
+      modelProvider: string,
+      modelName: string
+    ): Promise<void> => {
+      // Cancel any existing stream
+      abortControllerRef.current?.abort();
+
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
+
+      setStatus('streaming');
       setError(null);
 
-      const wsUrl = `${getWsBaseUrl()}/api/chat/ws/${conversationId}`;
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setStatus('connected');
-        reconnectCountRef.current = 0;
-        onOpen?.();
+      // Create stream config that bridges to the options callbacks
+      const config: StreamConfig = {
+        onToken: (content) => {
+          callbacksRef.current.onMessage?.({ type: 'token', data: { content } });
+        },
+        onThinking: (content) => {
+          callbacksRef.current.onMessage?.({ type: 'thinking', data: { content } });
+        },
+        onToolCallStart: (toolCall) => {
+          callbacksRef.current.onMessage?.({
+            type: 'tool_call_start',
+            data: toolCall as unknown as Record<string, unknown>,
+          });
+        },
+        onToolCallEnd: (toolCall) => {
+          callbacksRef.current.onMessage?.({
+            type: 'tool_call_end',
+            data: toolCall as unknown as Record<string, unknown>,
+          });
+        },
+        onComplete: () => {
+          callbacksRef.current.onMessage?.({ type: 'message_complete', data: {} });
+          setStatus('idle');
+        },
+        onError: (errorMsg) => {
+          setError(errorMsg);
+          setStatus('error');
+          callbacksRef.current.onError?.(errorMsg);
+          callbacksRef.current.onMessage?.({ type: 'error', data: { message: errorMsg } });
+        },
       };
 
-      ws.onclose = () => {
-        setStatus('disconnected');
-        onClose?.();
-
-        // Auto reconnect
-        if (reconnectCountRef.current < reconnectAttempts) {
-          reconnectCountRef.current++;
-          reconnectTimeoutRef.current = setTimeout(() => {
-            connect(conversationId);
-          }, reconnectInterval);
+      try {
+        await streamChat(
+          sessionId,
+          message,
+          modelProvider,
+          modelName,
+          config,
+          abortControllerRef.current.signal
+        );
+      } catch (e) {
+        // Ignore abort errors (user cancelled)
+        if (e instanceof Error && e.name === 'AbortError') {
+          setStatus('idle');
+          return;
         }
-      };
 
-      ws.onerror = (event) => {
+        const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+        setError(errorMsg);
         setStatus('error');
-        setError('WebSocket connection error');
-        onError?.(event);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data) as WebSocketEvent;
-          onMessage?.(data);
-        } catch (e) {
-          console.error('Failed to parse WebSocket message:', e);
-        }
-      };
-    },
-    [cleanup, onMessage, onOpen, onClose, onError, reconnectAttempts, reconnectInterval]
-  );
-
-  const disconnect = useCallback(() => {
-    reconnectCountRef.current = reconnectAttempts; // Prevent reconnect
-    cleanup();
-    setStatus('disconnected');
-  }, [cleanup, reconnectAttempts]);
-
-  const send = useCallback(
-    (data: Record<string, unknown>) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify(data));
-        return true;
+        callbacksRef.current.onError?.(errorMsg);
       }
-      return false;
     },
     []
   );
 
+  /**
+   * Stop the current stream
+   */
+  const stopStream = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setStatus('idle');
+  }, []);
+
   return {
     status,
     error,
-    connect,
-    disconnect,
-    send,
-    isConnected: status === 'connected',
+    sendMessage,
+    stopStream,
+    isStreaming: status === 'streaming',
   };
 }
+
+// Keep the old hook name as an alias for backward compatibility
+export const useWebSocket = useStream;

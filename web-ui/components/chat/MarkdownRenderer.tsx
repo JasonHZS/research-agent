@@ -50,7 +50,7 @@ function CodeBlock({
           <Copy className="h-4 w-4 text-muted-foreground" />
         )}
       </button>
-      <code className={className} {...props}>
+      <code className={cn(className, 'text-foreground/90')} {...props}>
         {children}
       </code>
     </div>
@@ -100,6 +100,8 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
         table: TableWrapper as any,
         // Add horizontal rule styling
         hr: () => <hr className="border-border my-6" />,
+        // Custom strong tag styling (semi-bold)
+        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
         // Add image styling
         img: ({ src, alt, ...props }) => (
           <img

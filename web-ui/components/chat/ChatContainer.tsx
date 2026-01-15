@@ -1,24 +1,23 @@
 'use client';
 
 import { useCallback, useEffect } from 'react';
-import { Menu, Settings } from 'lucide-react';
+import { Plus, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { useStream } from '@/hooks/useWebSocket';
 import { useChatStore } from '@/hooks/useChat';
-import type { WebSocketEvent, ToolCall } from '@/lib/api';
+import type { StreamEvent, ToolCall } from '@/lib/types';
+import { generateId } from '@/lib/utils';
 
-interface ChatContainerProps {
-  onMenuClick?: () => void;
-}
-
-export function ChatContainer({ onMenuClick }: ChatContainerProps) {
+export function ChatContainer() {
   const {
-    currentConversationId,
+    sessionId,
     currentModelProvider,
     currentModelName,
+    currentMessages,
     streamingMessage,
+    isLoading,
     addUserMessage,
     startStreaming,
     appendToken,
@@ -28,11 +27,14 @@ export function ChatContainer({ onMenuClick }: ChatContainerProps) {
     finishStreaming,
     setError,
     loadModels,
+    newChat,
   } = useChatStore();
 
-  // Handle WebSocket messages
-  const handleWebSocketMessage = useCallback(
-    (event: WebSocketEvent) => {
+  const hasMessages = currentMessages.length > 0 || streamingMessage;
+
+  // Handle stream messages
+  const handleStreamMessage = useCallback(
+    (event: StreamEvent) => {
       switch (event.type) {
         case 'token':
           appendToken(event.data.content as string);
@@ -55,22 +57,19 @@ export function ChatContainer({ onMenuClick }: ChatContainerProps) {
           break;
       }
     },
-    [appendToken, appendThinking, addToolCallStart, updateToolCallEnd, finishStreaming, setError]
+    [
+      appendToken,
+      appendThinking,
+      addToolCallStart,
+      updateToolCallEnd,
+      finishStreaming,
+      setError,
+    ]
   );
 
-  const { connect, disconnect, send, isConnected, status } = useWebSocket({
-    onMessage: handleWebSocketMessage,
+  const { sendMessage, stopStream, isStreaming, status } = useStream({
+    onMessage: handleStreamMessage,
   });
-
-  // Connect to WebSocket when conversation changes
-  useEffect(() => {
-    if (currentConversationId) {
-      connect(currentConversationId);
-    }
-    return () => {
-      disconnect();
-    };
-  }, [currentConversationId, connect, disconnect]);
 
   // Load models on mount
   useEffect(() => {
@@ -79,91 +78,141 @@ export function ChatContainer({ onMenuClick }: ChatContainerProps) {
 
   // Handle send message
   const handleSend = useCallback(
-    (message: string) => {
-      if (!currentConversationId || !isConnected) {
-        setError('Not connected to server');
+    async (message: string) => {
+      if (!sessionId) {
+        setError('No session ID');
         return;
       }
 
       // Add user message to UI
       addUserMessage(message);
 
-      // Start streaming state
-      startStreaming();
+      const requestId = generateId();
 
-      // Send message via WebSocket
-      send({
-        message,
-        model_provider: currentModelProvider,
-        model_name: currentModelName,
-      });
+      // Start streaming state
+      startStreaming(requestId);
+
+      // Send message via SSE stream
+      await sendMessage(sessionId, message, currentModelProvider, currentModelName);
     },
     [
-      currentConversationId,
-      isConnected,
+      sessionId,
       currentModelProvider,
       currentModelName,
       addUserMessage,
       startStreaming,
-      send,
+      sendMessage,
       setError,
     ]
   );
 
   // Handle stop streaming
   const handleStop = useCallback(() => {
-    // TODO: Implement stop streaming
+    stopStream();
     finishStreaming();
-  }, [finishStreaming]);
+  }, [stopStream, finishStreaming]);
+
+  const handleNewChat = useCallback(() => {
+    newChat();
+  }, [newChat]);
+
+  const toggleTheme = useCallback(() => {
+    const html = document.documentElement;
+    if (html.classList.contains('dark')) {
+      html.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    } else {
+      html.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    }
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onMenuClick}
-            className="md:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+        <div className="flex items-center gap-3">
           <h1 className="font-semibold text-lg">Research Agent</h1>
-          {/* Connection status indicator */}
+          {/* Streaming status indicator */}
           <div
             className={`w-2 h-2 rounded-full ${
-              status === 'connected'
-                ? 'bg-green-500'
-                : status === 'connecting'
-                ? 'bg-yellow-500'
-                : 'bg-red-500'
+              isStreaming
+                ? 'bg-yellow-500 animate-pulse'
+                : status === 'error'
+                ? 'bg-red-500'
+                : 'bg-green-500'
             }`}
             title={`Status: ${status}`}
           />
+          <div className="w-px h-4 bg-border mx-2" />
+          <Button
+            onClick={handleNewChat}
+            disabled={isLoading || isStreaming}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            New Chat
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground hidden sm:inline">
             {currentModelName}
           </span>
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+            className="h-9 w-9"
+          >
+            <Sun className="h-4 w-4 dark:hidden" />
+            <Moon className="h-4 w-4 hidden dark:block" />
           </Button>
         </div>
       </header>
 
-      {/* Messages */}
-      <MessageList className="flex-1" />
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-h-0">
+        {!hasMessages ? (
+          // Empty State: Centered Layout
+          <div className="flex-1 flex flex-col justify-center pb-[10vh]">
+            <div className="w-full max-w-5xl mx-auto px-4 mb-8">
+              <div className="flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Sun className="w-8 h-8 text-primary" />
+                </div>
+                <h2 className="text-2xl font-semibold mb-2">Start Your Research</h2>
+                <p className="text-muted-foreground max-w-md">
+                  Ask me about AI research, recent papers, tech trends, or anything else you'd like to explore.
+                </p>
+              </div>
+            </div>
 
-      {/* Input */}
-      <InputArea
-        onSend={handleSend}
-        onStop={handleStop}
-        isStreaming={!!streamingMessage}
-        disabled={!isConnected}
-        placeholder={isConnected ? 'Ask anything...' : 'Connecting...'}
-      />
+            <InputArea
+              onSend={handleSend}
+              onStop={handleStop}
+              isStreaming={!!streamingMessage}
+              disabled={false}
+              placeholder="Explore cutting-edge AI research..."
+            />
+          </div>
+        ) : (
+          // Active State: Standard Chat Layout
+          <>
+            <MessageList className="flex-1" />
+            <InputArea
+              onSend={handleSend}
+              onStop={handleStop}
+              isStreaming={!!streamingMessage}
+              disabled={false}
+              placeholder="Explore cutting-edge AI research..."
+            />
+          </>
+        )}
+      </main>
     </div>
   );
 }

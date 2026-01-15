@@ -15,7 +15,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ToolCall } from '@/lib/api';
+import type { ToolCall } from '@/lib/types';
 
 // Tool icon mapping
 const TOOL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {

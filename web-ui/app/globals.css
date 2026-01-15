@@ -17,7 +17,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 12%;
 
-    --primary: 22 92% 52%;
+    --primary: 22 75% 52%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 5% 96%;
@@ -49,7 +49,7 @@
     --popover: 240 10% 12%;
     --popover-foreground: 0 0% 95%;
 
-    --primary: 22 92% 52%;
+    --primary: 22 75% 52%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 5% 18%;
@@ -107,15 +107,15 @@
 }
 
 .markdown-content h1 {
-  @apply text-2xl font-bold mt-6 mb-4;
+  @apply text-3xl font-bold mt-6 mb-4;
 }
 
 .markdown-content h2 {
-  @apply text-xl font-bold mt-5 mb-3;
+  @apply text-2xl font-bold mt-5 mb-3;
 }
 
 .markdown-content h3 {
-  @apply text-lg font-semibold mt-4 mb-2;
+  @apply text-xl font-semibold mt-4 mb-2;
 }
 
 .markdown-content p {
@@ -175,6 +175,11 @@
 
 .markdown-content pre code {
   @apply bg-transparent p-0;
+}
+
+.markdown-content pre code::selection,
+.markdown-content pre code::-moz-selection {
+  color: hsl(var(--foreground));
 }
 
 /* Syntax highlighting (highlight.js) */

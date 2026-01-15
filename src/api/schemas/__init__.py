@@ -8,8 +8,12 @@ from src.api.schemas.chat import (
     ConversationCreate,
     ConversationSummary,
     ModelInfo,
+    StreamEvent,
+    StreamEventType,
     ToolCall,
+    # Backward compatibility aliases
     WebSocketEvent,
+    WebSocketEventType,
 )
 
 __all__ = [
@@ -20,6 +24,10 @@ __all__ = [
     "ConversationCreate",
     "ConversationSummary",
     "ModelInfo",
+    "StreamEvent",
+    "StreamEventType",
     "ToolCall",
+    # Backward compatibility
     "WebSocketEvent",
+    "WebSocketEventType",
 ]

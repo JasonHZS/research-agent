@@ -1,9 +1,8 @@
 'use client';
 
 import { useCallback } from 'react';
-import { Plus, PanelLeftClose, PanelLeft, Sun, Moon } from 'lucide-react';
+import { Plus, PanelLeftClose, PanelLeft, Sun, Moon, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ConversationList } from './ConversationList';
 import { ModelSelector } from './ModelSelector';
 import { useChatStore } from '@/hooks/useChat';
 import { cn } from '@/lib/utils';
@@ -15,11 +14,11 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onToggle, className }: SidebarProps) {
-  const { createConversation, isLoading } = useChatStore();
+  const { newChat, isLoading, currentMessages } = useChatStore();
 
   const handleNewChat = useCallback(() => {
-    createConversation();
-  }, [createConversation]);
+    newChat();
+  }, [newChat]);
 
   // Theme toggle (basic implementation)
   const toggleTheme = useCallback(() => {
@@ -86,8 +85,26 @@ export function Sidebar({ isOpen, onToggle, className }: SidebarProps) {
           </Button>
         </div>
 
-        {/* Conversation List */}
-        <ConversationList className="flex-1 overflow-hidden" />
+        {/* Session Info (replaces conversation list) */}
+        <div className="flex-1 p-3">
+          <div className="text-sm text-muted-foreground mb-2">Current Session</div>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent">
+            <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">
+                {currentMessages.length > 0
+                  ? `${currentMessages.length} messages`
+                  : 'New conversation'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Session active
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-3 px-1">
+            Messages are not persisted. Starting a new chat will clear the current conversation.
+          </p>
+        </div>
 
         {/* Footer */}
         <div className="p-3 border-t border-border space-y-3">

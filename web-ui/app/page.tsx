@@ -1,36 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Sidebar } from '@/components/sidebar/Sidebar';
+import { useEffect } from 'react';
 import { ChatContainer } from '@/components/chat/ChatContainer';
 import { useChatStore } from '@/hooks/useChat';
 
 export default function Home() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { loadConversations, currentConversationId, createConversation } = useChatStore();
+  const { initSession, sessionId } = useChatStore();
 
+  // Initialize session on mount
   useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
-
-  // Create a new conversation if none exists
-  useEffect(() => {
-    if (!currentConversationId) {
-      createConversation();
-    }
-  }, [currentConversationId, createConversation]);
+    initSession();
+  }, [initSession]);
 
   return (
     <>
-      {/* Sidebar */}
-      <Sidebar
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-      />
-
       {/* Main Chat Area */}
       <main className="flex-1 flex flex-col min-w-0">
-        <ChatContainer onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+        <ChatContainer />
       </main>
     </>
   );
