@@ -226,3 +226,12 @@ package-lock.json
 *.swp
 *.swo
 *~
+
+# Agent Chat UI (cloned separately)
+agent-chat-ui/
+
+# LangGraph
+.langgraph/
+.langgraph-cache/
+# LangGraph
+.langgraph_api/

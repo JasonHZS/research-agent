@@ -75,7 +75,23 @@ async def clarify_with_user_node(
     messages = get_state_value(state, "messages", [])
 
     # 从 messages 中提取用户的完整意图作为 original_query
-    user_messages = [m.content for m in messages if isinstance(m, HumanMessage)]
+    # 处理多模态消息格式：content 可能是 str 或 list[dict]
+    def extract_text_from_content(content) -> str:
+        """从消息内容中提取纯文本，支持字符串和多模态格式。"""
+        if isinstance(content, str):
+            return content
+        elif isinstance(content, list):
+            # 多模态格式: [{"type": "text", "text": "..."}, ...]
+            texts = []
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    texts.append(block.get("text", ""))
+                elif isinstance(block, str):
+                    texts.append(block)
+            return "\n".join(texts)
+        return str(content)
+
+    user_messages = [extract_text_from_content(m.content) for m in messages if isinstance(m, HumanMessage)]
     original_query = "\n".join(user_messages) if user_messages else ""
 
     # 如果禁用澄清，直接跳过进入 analyze
