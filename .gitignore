@@ -243,3 +243,6 @@ data/*.db-shm
 
 # Cloned repos for testing
 agent-chat-ui/
+
+# LangGraph runtime cache
+.langgraph_api/
