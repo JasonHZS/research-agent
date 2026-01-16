@@ -6,6 +6,7 @@ Clarify With User Node
 通过 Command API 控制流转移。
 """
 
+import logging
 from datetime import datetime
 from typing import Literal
 
@@ -22,10 +23,12 @@ from langgraph.types import Command
 
 from src.prompts import load_prompt
 
-from ..state import AgentState, DeepResearchConfig
+from ..state import AgentState, ClarificationStatus, DeepResearchConfig
 from ..structured_outputs import ClarifyWithUser
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
+
+logger = logging.getLogger(__name__)
 
 
 def _get_config(config: RunnableConfig) -> DeepResearchConfig:
@@ -156,6 +159,8 @@ async def clarify_with_user_node(
             verification="了解，我现在开始为您进行深度研究。",
         )
 
+    # 日志打印原始决策 JSON（供调试，不发送到前端）
+    logger.info(f"Clarify decision: {result.model_dump_json()}")
     print(
         f"\n[ClarifyWithUser]: "
         f"{result.verification if not result.need_clarification else result.question}"
@@ -163,10 +168,16 @@ async def clarify_with_user_node(
 
     if result.need_clarification:
         # 需要澄清：中断并等待用户响应
+        # 通过 clarification_status 字段传递结构化决策，避免下游解析 JSON
         return Command(
             goto=END,
             update={
                 "messages": [AIMessage(content=result.question)],
+                "clarification_status": ClarificationStatus(
+                    need_clarification=True,
+                    question=result.question,
+                    verification="",
+                ),
                 "original_query": original_query,
             },
         )
@@ -176,6 +187,11 @@ async def clarify_with_user_node(
             goto="analyze",
             update={
                 "messages": [AIMessage(content=result.verification)],
+                "clarification_status": ClarificationStatus(
+                    need_clarification=False,
+                    question="",
+                    verification=result.verification,
+                ),
                 "original_query": original_query,
             },
         )

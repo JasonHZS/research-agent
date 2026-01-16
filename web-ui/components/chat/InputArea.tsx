@@ -13,6 +13,8 @@ interface InputAreaProps {
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  isDeepResearch?: boolean;
+  onToggleDeepResearch?: () => void;
 }
 
 export function InputArea({
@@ -22,6 +24,8 @@ export function InputArea({
   disabled = false,
   placeholder = 'Research anything...',
   className,
+  isDeepResearch = false,
+  onToggleDeepResearch,
 }: InputAreaProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -68,7 +72,7 @@ export function InputArea({
   return (
     <div className={cn('bg-background p-4', className)}>
       <div className="max-w-3xl mx-auto">
-        <div className="relative flex items-end gap-2 bg-card border border-border rounded-2xl px-4 py-2 shadow-sm transition-shadow duration-300 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.4),0_0_40px_hsl(var(--primary)/0.2)] focus-within:border-primary/50">
+        <div className="relative flex flex-col gap-2 bg-card border border-border rounded-2xl px-4 py-3 shadow-sm transition-shadow duration-300 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.4),0_0_40px_hsl(var(--primary)/0.2)] focus-within:border-primary/50">
           {/* Input textarea */}
           <textarea
             ref={textareaRef}
@@ -78,42 +82,66 @@ export function InputArea({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="flex-1 resize-none bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground min-h-[94px] max-h-[300px] py-1 scrollbar-thin"
+            className="w-full resize-none bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground min-h-[60px] max-h-[300px] py-1 scrollbar-thin"
           />
 
-          <ModelSelector
-            buttonVariant="ghost"
-            buttonSize="sm"
-            fullWidth={false}
-            align="end"
-            className="h-8 rounded-full px-3 text-xs"
-          />
-
-          {/* Action button */}
-          {isStreaming ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onStop}
-              className="shrink-0 h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              <StopCircle className="h-5 w-5" />
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleSubmit}
-              disabled={!input.trim() || disabled}
-              className="shrink-0 h-8 w-8 text-primary hover:text-primary hover:bg-primary/10 disabled:opacity-50"
-            >
-              {disabled ? (
-                <Loader2 className="h-5 w-5 spinner" />
-              ) : (
-                <Send className="h-5 w-5" />
+          <div className="flex items-center justify-between">
+            {/* Deep Research Toggle */}
+            <div className="flex items-center">
+              {onToggleDeepResearch && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onToggleDeepResearch}
+                  className={cn(
+                    "deep-research-btn h-7 gap-1.5 px-3 text-xs font-medium rounded-lg border transition-all duration-200",
+                    isDeepResearch 
+                      ? "active" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted border-transparent"
+                  )}
+                  title={isDeepResearch ? "Deep Research Mode On" : "Enable Deep Research Mode"}
+                >
+                  Deep Research
+                </Button>
               )}
-            </Button>
-          )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <ModelSelector
+                buttonVariant="ghost"
+                buttonSize="sm"
+                fullWidth={false}
+                align="end"
+                className="h-8 rounded-full px-3 text-xs"
+              />
+
+              {/* Action button */}
+              {isStreaming ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onStop}
+                  className="shrink-0 h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <StopCircle className="h-5 w-5" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSubmit}
+                  disabled={!input.trim() || disabled}
+                  className="shrink-0 h-8 w-8 text-primary hover:text-primary hover:bg-primary/10 disabled:opacity-50"
+                >
+                  {disabled ? (
+                    <Loader2 className="h-5 w-5 spinner" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Hint text */}

@@ -99,6 +99,8 @@ class StreamEventType(str, Enum):
     MESSAGE_COMPLETE = "message_complete"
     ERROR = "error"
     THINKING = "thinking"
+    CLARIFICATION = "clarification"  # Deep Research 澄清问题
+    BRIEF = "brief"  # Deep Research 研究大纲
 
 
 class StreamEvent(BaseModel):

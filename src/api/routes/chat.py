@@ -24,6 +24,7 @@ class ChatStreamRequest(BaseModel):
     message: str
     model_provider: str = "aliyun"
     model_name: str = "qwen-max"
+    is_deep_research: bool = False
 
 
 class ChatResetRequest(BaseModel):
@@ -58,6 +59,7 @@ async def stream_chat(request: ChatStreamRequest) -> StreamingResponse:
                 message=request.message,
                 model_provider=request.model_provider,
                 model_name=request.model_name,
+                is_deep_research=request.is_deep_research,
             ):
                 # Log key events only
                 if event.type in {

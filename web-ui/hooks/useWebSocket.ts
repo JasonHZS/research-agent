@@ -36,7 +36,8 @@ export function useStream(options: UseStreamOptions = {}) {
       sessionId: string,
       message: string,
       modelProvider: string,
-      modelName: string
+      modelName: string,
+      isDeepResearch: boolean
     ): Promise<void> => {
       // Cancel any existing stream
       abortControllerRef.current?.abort();
@@ -67,8 +68,17 @@ export function useStream(options: UseStreamOptions = {}) {
             data: toolCall as unknown as Record<string, unknown>,
           });
         },
-        onComplete: () => {
-          callbacksRef.current.onMessage?.({ type: 'message_complete', data: {} });
+        onClarification: (question) => {
+          callbacksRef.current.onMessage?.({ type: 'clarification', data: { question } });
+        },
+        onBrief: (brief) => {
+          callbacksRef.current.onMessage?.({ type: 'brief', data: brief as unknown as Record<string, unknown> });
+        },
+        onComplete: (data) => {
+          callbacksRef.current.onMessage?.({ 
+            type: 'message_complete', 
+            data: { is_clarification: data?.is_clarification } 
+          });
           setStatus('idle');
         },
         onError: (errorMsg) => {
@@ -85,6 +95,7 @@ export function useStream(options: UseStreamOptions = {}) {
           message,
           modelProvider,
           modelName,
+          isDeepResearch,
           config,
           abortControllerRef.current.signal
         );

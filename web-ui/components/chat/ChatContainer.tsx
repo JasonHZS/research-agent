@@ -7,7 +7,7 @@ import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import { useStream } from '@/hooks/useWebSocket';
 import { useChatStore } from '@/hooks/useChat';
-import type { StreamEvent, ToolCall } from '@/lib/types';
+import type { StreamEvent, ToolCall, ResearchBrief } from '@/lib/types';
 import { generateId } from '@/lib/utils';
 
 export function ChatContainer() {
@@ -24,10 +24,14 @@ export function ChatContainer() {
     appendThinking,
     addToolCallStart,
     updateToolCallEnd,
+    setClarification,
+    setBrief,
     finishStreaming,
     setError,
     loadModels,
     newChat,
+    isDeepResearch,
+    toggleDeepResearch,
   } = useChatStore();
 
   const hasMessages = currentMessages.length > 0 || streamingMessage;
@@ -48,8 +52,19 @@ export function ChatContainer() {
         case 'tool_call_end':
           updateToolCallEnd(event.data as unknown as ToolCall);
           break;
+        case 'clarification':
+          // Deep Research: set clarification question
+          setClarification(event.data.question as string);
+          break;
+        case 'brief':
+          // Deep Research: set research brief
+          setBrief(event.data as unknown as ResearchBrief);
+          break;
         case 'message_complete':
-          finishStreaming();
+          // Pass isClarification flag from server
+          finishStreaming({ 
+            isClarification: event.data.is_clarification as boolean | undefined 
+          });
           break;
         case 'error':
           setError(event.data.message as string);
@@ -62,6 +77,8 @@ export function ChatContainer() {
       appendThinking,
       addToolCallStart,
       updateToolCallEnd,
+      setClarification,
+      setBrief,
       finishStreaming,
       setError,
     ]
@@ -93,12 +110,13 @@ export function ChatContainer() {
       startStreaming(requestId);
 
       // Send message via SSE stream
-      await sendMessage(sessionId, message, currentModelProvider, currentModelName);
+      await sendMessage(sessionId, message, currentModelProvider, currentModelName, isDeepResearch);
     },
     [
       sessionId,
       currentModelProvider,
       currentModelName,
+      isDeepResearch,
       addUserMessage,
       startStreaming,
       sendMessage,
@@ -196,7 +214,9 @@ export function ChatContainer() {
               onStop={handleStop}
               isStreaming={!!streamingMessage}
               disabled={false}
-              placeholder="Explore cutting-edge AI research..."
+              placeholder={isDeepResearch ? "Deep Research Mode enabled..." : "Explore cutting-edge AI research..."}
+              isDeepResearch={isDeepResearch}
+              onToggleDeepResearch={toggleDeepResearch}
             />
           </div>
         ) : (
@@ -208,7 +228,9 @@ export function ChatContainer() {
               onStop={handleStop}
               isStreaming={!!streamingMessage}
               disabled={false}
-              placeholder="Explore cutting-edge AI research..."
+              placeholder={isDeepResearch ? "Deep Research Mode enabled..." : "Explore cutting-edge AI research..."}
+              isDeepResearch={isDeepResearch}
+              onToggleDeepResearch={toggleDeepResearch}
             />
           </>
         )}

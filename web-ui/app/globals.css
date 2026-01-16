@@ -111,15 +111,21 @@
 }
 
 .markdown-content h2 {
-  @apply text-2xl font-bold mt-5 mb-3;
+  @apply text-2xl font-bold mt-5 mb-4;
 }
 
 .markdown-content h3 {
-  @apply text-xl font-semibold mt-4 mb-2;
+  @apply text-xl font-semibold mt-4 mb-3;
 }
 
 .markdown-content p {
-  @apply mb-4 last:mb-0;
+  @apply mb-4 last:mb-0 break-words;
+}
+
+/* 章节标题后的描述段落增加换行和间距 */
+.markdown-content h2 + p,
+.markdown-content h3 + p {
+  @apply mt-2 leading-relaxed break-words whitespace-normal;
 }
 
 .markdown-content ul,
@@ -222,4 +228,60 @@
 
 .spinner {
   animation: spin 1s linear infinite;
+}
+
+/* Deep Research button - bounce + flash */
+@keyframes bounce-in {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.08);
+  }
+  60% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes flash-highlight {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.deep-research-btn {
+  @apply relative overflow-hidden;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+/* Flash overlay */
+.deep-research-btn.active::before {
+  content: '';
+  @apply absolute inset-0 rounded-lg;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    hsl(var(--primary) / 0.4) 50%,
+    transparent 100%
+  );
+  animation: flash-highlight 0.4s ease-out forwards;
+  pointer-events: none;
+}
+
+.deep-research-btn.active {
+  @apply text-primary bg-primary/10 border-primary/20;
+  animation: bounce-in 0.35s ease-out;
+}
+
+.deep-research-btn.active:hover {
+  @apply bg-primary/15 border-primary/30;
 }

@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { api } from '@/lib/api';
-import type { ChatMessage, ModelInfo, ToolCall, MessageSegment } from '@/lib/types';
+import type { ChatMessage, ModelInfo, ToolCall, MessageSegment, ResearchBrief } from '@/lib/types';
 import { generateId, getStoredSessionId, resetSessionId } from '@/lib/utils';
 
 /**
@@ -17,6 +17,8 @@ export interface StreamingMessage {
   segments: MessageSegment[];
   isStreaming: boolean;
   thinkingContent?: string;
+  /** Whether this is a clarification question (Deep Research mode) */
+  isClarification?: boolean;
 }
 
 /**
@@ -31,6 +33,9 @@ interface ChatState {
   models: ModelInfo[];
   currentModelProvider: string;
   currentModelName: string;
+  
+  // Research Mode
+  isDeepResearch: boolean;
 
   // Streaming state
   streamingMessage: StreamingMessage | null;
@@ -46,6 +51,7 @@ interface ChatState {
   // Model actions
   loadModels: () => Promise<void>;
   setModel: (provider: string, name: string) => void;
+  toggleDeepResearch: () => void;
 
   // Message handling
   addUserMessage: (content: string) => void;
@@ -54,7 +60,11 @@ interface ChatState {
   appendThinking: (content: string) => void;
   addToolCallStart: (toolCall: ToolCall) => void;
   updateToolCallEnd: (toolCall: ToolCall) => void;
-  finishStreaming: () => void;
+  /** Set clarification question content (Deep Research mode) */
+  setClarification: (question: string) => void;
+  /** Set research brief (Deep Research mode) */
+  setBrief: (brief: ResearchBrief) => void;
+  finishStreaming: (options?: { isClarification?: boolean }) => void;
   setError: (error: string | null) => void;
   clearMessages: () => void;
 }
@@ -66,6 +76,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   models: [],
   currentModelProvider: 'aliyun',
   currentModelName: 'qwen-max',
+  isDeepResearch: false,
   streamingMessage: null,
   isLoading: false,
   error: null,
@@ -128,6 +139,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Set current model
   setModel: (provider: string, name: string) => {
     set({ currentModelProvider: provider, currentModelName: name });
+  },
+
+  // Toggle Deep Research mode
+  toggleDeepResearch: () => {
+    set((state) => ({ isDeepResearch: !state.isDeepResearch }));
   },
 
   // Add user message to current conversation
@@ -271,16 +287,77 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  // Set clarification question (Deep Research mode)
+  setClarification: (question: string) => {
+    const { streamingMessage } = get();
+    if (streamingMessage) {
+      // Create a text segment with the clarification question
+      const segments: MessageSegment[] = [{ type: 'text', content: question }];
+      
+      set({
+        streamingMessage: {
+          ...streamingMessage,
+          content: question,
+          segments,
+          isClarification: true,
+        },
+      });
+    }
+  },
+
+  // Set research brief (Deep Research mode)
+  setBrief: (brief: ResearchBrief) => {
+    const { streamingMessage } = get();
+    if (streamingMessage) {
+      // Format brief as markdown
+      const sectionsText = brief.sections
+        .map((s, i) => `${i + 1}. **${s.title}**\n   ${s.description}`)
+        .join('\n\n');
+      
+      const briefContent = `**研究大纲**\n\n${sectionsText}`;
+      
+      // Append brief to existing content or create new
+      const newContent = streamingMessage.content 
+        ? `${streamingMessage.content}\n\n${briefContent}`
+        : briefContent;
+      
+      // Update segments
+      const segments = [...streamingMessage.segments];
+      const lastSegment = segments[segments.length - 1];
+      
+      if (!lastSegment || lastSegment.type === 'tool_calls') {
+        segments.push({ type: 'text', content: briefContent });
+      } else {
+        segments[segments.length - 1] = {
+          ...lastSegment,
+          content: lastSegment.content + '\n\n' + briefContent,
+        };
+      }
+      
+      set({
+        streamingMessage: {
+          ...streamingMessage,
+          content: newContent,
+          segments,
+        },
+      });
+    }
+  },
+
   // Finish streaming and add message to conversation
-  finishStreaming: () => {
+  finishStreaming: (options?: { isClarification?: boolean }) => {
     const { streamingMessage, currentMessages } = get();
     if (streamingMessage) {
+      // Determine if this is a clarification message
+      const isClarification = options?.isClarification ?? streamingMessage.isClarification;
+      
       const finalMessage: ChatMessage = {
         id: streamingMessage.id,
         role: 'assistant',
         content: streamingMessage.content,
         tool_calls: streamingMessage.toolCalls,
         segments: streamingMessage.segments,
+        isClarification,
         created_at: new Date().toISOString(),
       };
       set({

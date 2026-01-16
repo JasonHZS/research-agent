@@ -16,6 +16,8 @@ from src.agent.research_agent import (
     run_research_async,
     run_research_stream,
 )
+from src.deep_research.graph import build_deep_research_graph
+from src.deep_research.state import ClarificationStatus, Section
 from src.api.schemas.chat import (
     ModelInfo,
     StreamEvent,
@@ -32,9 +34,9 @@ class AgentService:
     def __init__(self):
         """Initialize the agent service."""
         self._agents: dict[str, Any] = {}  # conversation_id -> agent
-        self._checkpointers: dict[str, MemorySaver] = {}
-        self._stores: dict[str, InMemoryStore] = {}
-        self._agent_configs: dict[str, tuple[str, Optional[str]]] = {}
+        self._checkpointers: dict[tuple[str, bool], MemorySaver] = {}
+        self._stores: dict[tuple[str, bool], InMemoryStore] = {}
+        self._agent_configs: dict[str, tuple[str, Optional[str], bool]] = {}
         self._hn_mcp_tools: Optional[list] = None
 
     def set_mcp_tools(self, hn_mcp_tools: Optional[list]) -> None:
@@ -46,46 +48,61 @@ class AgentService:
         conversation_id: str,
         model_provider: str = "aliyun",
         model_name: Optional[str] = None,
+        is_deep_research: bool = False,
     ) -> Any:
         """Get existing agent or create a new one for the conversation."""
         requested_provider = model_provider or "aliyun"
         requested_model = model_name
-
-        checkpointer = self._checkpointers.get(conversation_id)
-        store = self._stores.get(conversation_id)
+        
+        state_key = (conversation_id, is_deep_research)
+        checkpointer = self._checkpointers.get(state_key)
+        store = self._stores.get(state_key)
 
         if checkpointer is None:
             checkpointer = MemorySaver()
-            self._checkpointers[conversation_id] = checkpointer
+            self._checkpointers[state_key] = checkpointer
         if store is None:
             store = InMemoryStore()
-            self._stores[conversation_id] = store
+            self._stores[state_key] = store
 
         cached_agent = self._agents.get(conversation_id)
         cached_config = self._agent_configs.get(conversation_id)
 
-        if cached_agent and cached_config == (requested_provider, requested_model):
+        # Check if we can reuse existing agent
+        # cached_config is now (provider, model, is_deep_research)
+        if cached_agent and cached_config == (requested_provider, requested_model, is_deep_research):
             print(f"Using existing agent for conversation {conversation_id}")
             return cached_agent
 
         if cached_agent:
             print(
-                f"Recreating agent for conversation {conversation_id} due to model/provider change: "
-                f"{cached_config} -> {(requested_provider, requested_model)}"
+                f"Recreating agent for conversation {conversation_id} due to config change: "
+                f"{cached_config} -> {(requested_provider, requested_model, is_deep_research)}"
             )
 
         try:
-            agent = create_research_agent(
-                hn_mcp_tools=self._hn_mcp_tools,
-                model_provider=requested_provider,
-                model_name=requested_model,
-                checkpointer=checkpointer,
-                store=store,
-                debug=False,
-            )
-            print(f"Agent ready for conversation {conversation_id} with provider={requested_provider}, model={requested_model}")
+            if is_deep_research:
+                print(f"Creating Deep Research agent for {conversation_id}")
+                agent = build_deep_research_graph(
+                    hn_mcp_tools=self._hn_mcp_tools,
+                    model_provider=requested_provider,
+                    model_name=requested_model,
+                    checkpointer=checkpointer,
+                    store=store,
+                )
+            else:
+                agent = create_research_agent(
+                    hn_mcp_tools=self._hn_mcp_tools,
+                    model_provider=requested_provider,
+                    model_name=requested_model,
+                    checkpointer=checkpointer,
+                    store=store,
+                    debug=False,
+                )
+            
+            print(f"Agent ready for conversation {conversation_id} with provider={requested_provider}, model={requested_model}, deep_research={is_deep_research}")
             self._agents[conversation_id] = agent
-            self._agent_configs[conversation_id] = (requested_provider, requested_model)
+            self._agent_configs[conversation_id] = (requested_provider, requested_model, is_deep_research)
             return agent
         except Exception as e:
             print(f"ERROR creating agent: {e}")
@@ -96,8 +113,9 @@ class AgentService:
     def remove_agent(self, conversation_id: str) -> None:
         """Remove agent instance for a conversation."""
         self._agents.pop(conversation_id, None)
-        self._checkpointers.pop(conversation_id, None)
-        self._stores.pop(conversation_id, None)
+        for mode in (False, True):
+            self._checkpointers.pop((conversation_id, mode), None)
+            self._stores.pop((conversation_id, mode), None)
         self._agent_configs.pop(conversation_id, None)
 
     @staticmethod
@@ -122,6 +140,7 @@ class AgentService:
         message: str,
         model_provider: str = "aliyun",
         model_name: Optional[str] = None,
+        is_deep_research: bool = False,
     ) -> AsyncGenerator[StreamEvent, None]:
         """
         Stream agent response as events.
@@ -129,7 +148,12 @@ class AgentService:
         Yields StreamEvent objects that can be serialized and sent to clients.
         Each request is independent - no cross-request state tracking needed.
         """
-        agent = self._get_or_create_agent(conversation_id, model_provider, model_name)
+        agent = self._get_or_create_agent(
+            conversation_id, 
+            model_provider, 
+            model_name,
+            is_deep_research=is_deep_research
+        )
 
         # Get existing tool call IDs from checkpoint BEFORE streaming
         # This prevents historical tool calls from being sent as new ones
@@ -154,6 +178,10 @@ class AgentService:
         active_tool_calls: dict[str, ToolCall] = {}
         seen_tool_ids: set[str] = existing_tool_ids.copy()  # Start with existing IDs
         tool_call_counter = 0
+        
+        # For Deep Research: track clarification status and brief from state updates
+        clarification_sent = False
+        brief_sent = False
 
         try:
             async for mode, chunk in run_research_stream(
@@ -167,6 +195,18 @@ class AgentService:
                     if not isinstance(message_chunk, AIMessage):
                         # Skip tool/system messages to prevent raw tool output from reaching UI
                         continue
+                    
+                    # For Deep Research: skip tokens from nodes that use structured output
+                    # These nodes output JSON which should not be displayed in the UI:
+                    # - clarify: ClarifyWithUser (handled via clarification_status)
+                    # - analyze: QueryAnalysis (internal routing decision)
+                    # - plan_sections: ResearchBrief (handled via BRIEF event)
+                    # - review: ReviewResult (internal evaluation, logged to backend only)
+                    if is_deep_research:
+                        current_node = metadata.get("langgraph_node", "")
+                        structured_output_nodes = {"clarify", "analyze", "plan_sections", "review"}
+                        if current_node in structured_output_nodes:
+                            continue
 
                     if hasattr(message_chunk, "content") and message_chunk.content:
                         content = message_chunk.content
@@ -192,10 +232,83 @@ class AgentService:
                                         )
 
                 elif mode == "updates":
-                    # Node updates - extract tool calls
+                    # Node updates - extract tool calls and clarification status
                     for node_name, node_data in chunk.items():
                         if node_data is None:
                             continue
+
+                        # For Deep Research: check clarification_status field directly
+                        # This is set by the clarify node via Command API
+                        if is_deep_research and not clarification_sent:
+                            clarification_status = node_data.get("clarification_status")
+                            # Handle LangGraph's Overwrite object
+                            if hasattr(clarification_status, "value"):
+                                clarification_status = clarification_status.value
+                            
+                            if clarification_status is not None:
+                                # Check if it's a ClarificationStatus instance or dict
+                                need_clarification = False
+                                question = ""
+                                verification = ""
+                                
+                                if isinstance(clarification_status, ClarificationStatus):
+                                    need_clarification = clarification_status.need_clarification
+                                    question = clarification_status.question
+                                    verification = clarification_status.verification
+                                elif isinstance(clarification_status, dict):
+                                    need_clarification = clarification_status.get("need_clarification", False)
+                                    question = clarification_status.get("question", "")
+                                    verification = clarification_status.get("verification", "")
+                                
+                                if need_clarification and question:
+                                    # Need clarification: send clarification event
+                                    yield StreamEvent(
+                                        type=StreamEventType.CLARIFICATION,
+                                        data={"question": question},
+                                    )
+                                    clarification_sent = True
+                                elif not need_clarification and verification:
+                                    # No clarification needed: send verification message as TOKEN
+                                    yield StreamEvent(
+                                        type=StreamEventType.TOKEN,
+                                        data={"content": verification},
+                                    )
+
+                        # For Deep Research: check for research_brief and sections (from plan_sections node)
+                        if is_deep_research and not brief_sent:
+                            research_brief = node_data.get("research_brief")
+                            sections = node_data.get("sections")
+                            
+                            # Handle LangGraph's Overwrite object
+                            if hasattr(research_brief, "value"):
+                                research_brief = research_brief.value
+                            if hasattr(sections, "value"):
+                                sections = sections.value
+                            
+                            if research_brief and sections:
+                                # Extract section info for the brief event
+                                section_list = []
+                                for s in sections:
+                                    if isinstance(s, Section):
+                                        section_list.append({
+                                            "title": s.title,
+                                            "description": s.description,
+                                        })
+                                    elif isinstance(s, dict):
+                                        section_list.append({
+                                            "title": s.get("title", ""),
+                                            "description": s.get("description", ""),
+                                        })
+                                
+                                if section_list:
+                                    yield StreamEvent(
+                                        type=StreamEventType.BRIEF,
+                                        data={
+                                            "research_brief": research_brief,
+                                            "sections": section_list,
+                                        },
+                                    )
+                                    brief_sent = True
 
                         messages = node_data.get("messages", [])
 
@@ -252,7 +365,8 @@ class AgentService:
             yield StreamEvent(
                 type=StreamEventType.MESSAGE_COMPLETE,
                 data={
-                    "tool_calls": [tc.model_dump() for tc in active_tool_calls.values()]
+                    "tool_calls": [tc.model_dump() for tc in active_tool_calls.values()],
+                    "is_clarification": clarification_sent,
                 },
             )
 
@@ -286,13 +400,41 @@ class AgentService:
                                 type=StreamEventType.TOKEN,
                                 data={"content": final_text},
                             )
+                        is_clarification = clarification_sent
+                        if is_deep_research and not is_clarification:
+                            try:
+                                state = agent.get_state(
+                                    {"configurable": {"thread_id": conversation_id}}
+                                )
+                                if state and state.values:
+                                    clarification_status = state.values.get(
+                                        "clarification_status"
+                                    )
+                                    if hasattr(clarification_status, "value"):
+                                        clarification_status = clarification_status.value
+                                    if isinstance(
+                                        clarification_status, ClarificationStatus
+                                    ):
+                                        is_clarification = (
+                                            clarification_status.need_clarification
+                                        )
+                                    elif isinstance(clarification_status, dict):
+                                        is_clarification = clarification_status.get(
+                                            "need_clarification", False
+                                        )
+                            except Exception as state_error:
+                                print(
+                                    "Warning: Could not read clarification status "
+                                    f"from state: {state_error}"
+                                )
                         yield StreamEvent(
                             type=StreamEventType.MESSAGE_COMPLETE,
                             data={
                                 "tool_calls": [
                                     tc.model_dump()
                                     for tc in active_tool_calls.values()
-                                ]
+                                ],
+                                "is_clarification": is_clarification,
                             },
                         )
                         return  # Success, exit retry loop

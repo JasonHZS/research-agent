@@ -40,6 +40,24 @@ class Section(BaseModel):
 
 
 # ==============================================================================
+# 澄清状态模型
+# ==============================================================================
+
+
+class ClarificationStatus(BaseModel):
+    """
+    澄清阶段的决策状态。
+
+    由 clarify 节点设置，用于向下游传递结构化的澄清决策，
+    避免在流处理层解析 JSON 字符串。
+    """
+
+    need_clarification: bool = Field(default=False, description="是否需要用户澄清")
+    question: str = Field(default="", description="澄清问题（当 need_clarification=True 时）")
+    verification: str = Field(default="", description="确认消息（当 need_clarification=False 时）")
+
+
+# ==============================================================================
 # 前置探索模型
 # ==============================================================================
 
@@ -103,6 +121,7 @@ class AgentOutputState(TypedDict):
 
     original_query: str
     messages: list[AnyMessage]
+    clarification_status: Optional[ClarificationStatus]
     query_type: str
     output_format: str
     discovered_items: list[DiscoveredItem]
@@ -130,6 +149,10 @@ class AgentState(MessagesState):
 
     # 用户交互（澄清问题/确认消息通过 messages 传递）
     original_query: str = ""
+
+    # === 澄清状态 ===
+    # 由 clarify 节点设置，传递结构化的澄清决策
+    clarification_status: Optional[ClarificationStatus] = None
 
     # === 查询分析 ===
     # 查询类型: list (有哪些) / comparison (对比) / deep_dive (深入) / general (一般)

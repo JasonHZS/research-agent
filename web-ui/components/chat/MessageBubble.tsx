@@ -218,7 +218,7 @@ export const MessageBubble = memo(function MessageBubble({
           <UserMessageBubble content={message.content} />
         )}
 
-        {/* Message Actions (Copy) - Only for assistant messages */}
+        {/* Message Actions (Copy) */}
         {isAssistant && !isStreaming && (
           <MessageActions 
             segments={message.segments} 
