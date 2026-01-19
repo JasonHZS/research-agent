@@ -12,9 +12,9 @@ from typing import Optional
 # 默认值
 # ==============================================================================
 
-DEFAULT_MAX_ITERATIONS = 3
-DEFAULT_MAX_CONCURRENT_RESEARCHERS = 3
-DEFAULT_MAX_TOOL_CALLS = 10
+DEFAULT_MAX_ITERATIONS = 2
+DEFAULT_MAX_CONCURRENT_RESEARCHERS = 5
+DEFAULT_MAX_TOOL_CALLS_PER_RESEARCHER = 10
 
 # ==============================================================================
 # 环境变量名
@@ -112,7 +112,7 @@ def get_max_tool_calls(override: Optional[int] = None) -> int:
         except ValueError:
             pass
 
-    return DEFAULT_MAX_TOOL_CALLS
+    return DEFAULT_MAX_TOOL_CALLS_PER_RESEARCHER
 
 
 def get_allow_clarification(override: Optional[bool] = None) -> bool:

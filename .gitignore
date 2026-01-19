@@ -226,3 +226,23 @@ package-lock.json
 *.swp
 *.swo
 *~
+
+# Next.js
+.next/
+out/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Database
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Cloned repos for testing
+agent-chat-ui/
+
+# LangGraph runtime cache
+.langgraph_api/

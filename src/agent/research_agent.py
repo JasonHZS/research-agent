@@ -341,6 +341,7 @@ async def run_research_stream(
     query: str,
     agent: Any,
     thread_id: Optional[str] = None,
+    extra_config: Optional[dict] = None,
 ) -> AsyncGenerator[tuple[str, Any], None]:
     """
     Stream research query execution with token-level streaming.
@@ -353,6 +354,7 @@ async def run_research_stream(
         query: The research question or topic to investigate.
         agent: Pre-created agent instance (required).
         thread_id: Unique thread identifier for multi-turn conversations.
+        extra_config: Additional configurable options (e.g., verbose, model_provider).
 
     Yields:
         Tuple of (mode, chunk) where:
@@ -370,10 +372,11 @@ async def run_research_stream(
         ...         message_chunk, metadata = chunk
         ...         print(message_chunk.content, end="", flush=True)
     """
-    # Build config with thread_id for multi-turn support
-    config = {}
-    if thread_id:
-        config = {"configurable": {"thread_id": thread_id}}
+    # Build config with thread_id and extra options for multi-turn support
+    configurable = {"thread_id": thread_id} if thread_id else {}
+    if extra_config:
+        configurable.update(extra_config)
+    config = {"configurable": configurable} if configurable else {}
 
     # Use mixed mode: "updates" for tool calls, "messages" for token streaming
     async for mode, chunk in agent.astream(

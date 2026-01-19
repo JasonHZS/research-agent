@@ -6,6 +6,7 @@ Clarify With User Node
 通过 Command API 控制流转移。
 """
 
+import logging
 from datetime import datetime
 from typing import Literal
 
@@ -22,10 +23,13 @@ from langgraph.types import Command
 
 from src.prompts import load_prompt
 
-from ..state import AgentState, DeepResearchConfig
+from ..state import AgentState, ClarificationStatus, DeepResearchConfig
 from ..structured_outputs import ClarifyWithUser
+from ..utils.display import render_tool_calls
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
+
+logger = logging.getLogger(__name__)
 
 
 def _get_config(config: RunnableConfig) -> DeepResearchConfig:
@@ -40,6 +44,7 @@ def _get_config(config: RunnableConfig) -> DeepResearchConfig:
         model_name=configurable.get("model_name"),
         enable_thinking=configurable.get("enable_thinking", False),
         allow_clarification=configurable.get("allow_clarification", True),
+        verbose=configurable.get("verbose", False),
     )
 
 
@@ -109,18 +114,29 @@ async def clarify_with_user_node(
         ),
     ]
 
+    # 收集工具调用日志（用于前端显示）
+    clarify_tool_calls_log: list = []
+
     for i in range(max_iterations):
         response = await llm_with_tools.ainvoke(tool_messages)
 
         if not response.tool_calls:
             break
 
+        # CLI verbose 模式打印（复用统一格式）
+        if deep_config.verbose:
+            render_tool_calls(
+                response.tool_calls, verbose=True, section_title="Clarify"
+            )
+
+        # 收集 AIMessage (with tool_calls) 用于前端显示
+        clarify_tool_calls_log.append(response)
+
         # 执行工具调用
         tool_results = []
         for tool_call in response.tool_calls:
             tool = next((t for t in tools if t.name == tool_call["name"]), None)
             if tool:
-                print(f"  [Clarify] 执行搜索: {tool_call['args'].get('query', '')}")
                 result = await tool.ainvoke(tool_call["args"])
                 tool_results.append(
                     ToolMessage(
@@ -129,6 +145,9 @@ async def clarify_with_user_node(
                     )
                 )
                 search_context += result + "\n\n"
+
+        # 收集 ToolMessage 用于前端显示
+        clarify_tool_calls_log.extend(tool_results)
 
         # 追加到消息历史
         tool_messages.append(response)
@@ -156,6 +175,8 @@ async def clarify_with_user_node(
             verification="了解，我现在开始为您进行深度研究。",
         )
 
+    # 日志打印原始决策 JSON（供调试，不发送到前端）
+    logger.info(f"Clarify decision: {result.model_dump_json()}")
     print(
         f"\n[ClarifyWithUser]: "
         f"{result.verification if not result.need_clarification else result.question}"
@@ -163,11 +184,18 @@ async def clarify_with_user_node(
 
     if result.need_clarification:
         # 需要澄清：中断并等待用户响应
+        # 通过 clarification_status 字段传递结构化决策，避免下游解析 JSON
         return Command(
             goto=END,
             update={
                 "messages": [AIMessage(content=result.question)],
+                "clarification_status": ClarificationStatus(
+                    need_clarification=True,
+                    question=result.question,
+                    verification="",
+                ),
                 "original_query": original_query,
+                "tool_calls_log": clarify_tool_calls_log,
             },
         )
     else:
@@ -176,6 +204,12 @@ async def clarify_with_user_node(
             goto="analyze",
             update={
                 "messages": [AIMessage(content=result.verification)],
+                "clarification_status": ClarificationStatus(
+                    need_clarification=False,
+                    question="",
+                    verification=result.verification,
+                ),
                 "original_query": original_query,
+                "tool_calls_log": clarify_tool_calls_log,
             },
         )

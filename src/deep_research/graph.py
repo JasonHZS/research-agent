@@ -72,10 +72,15 @@ async def aggregate_sections_node(
 # ==============================================================================
 
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.store.base import BaseStore
+
 def build_deep_research_graph(
     hn_mcp_tools: Optional[list] = None,
     model_provider: str = "aliyun",
     model_name: Optional[str] = None,
+    checkpointer: Optional[BaseCheckpointSaver] = None,
+    store: Optional[BaseStore] = None,
 ) -> StateGraph:
     """
     构建完整的深度研究图。
@@ -161,7 +166,7 @@ def build_deep_research_graph(
     # final_report -> END
     workflow.add_edge("final_report", END)
 
-    return workflow.compile()
+    return workflow.compile(checkpointer=checkpointer, store=store)
 
 
 # ==============================================================================

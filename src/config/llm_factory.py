@@ -12,12 +12,26 @@ LLM Factory
 import os
 from typing import Optional, Union
 
+import httpx
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
+
+# Streaming 场景下的超时配置
+# connect: 建立连接超时
+# read: 读取响应超时（streaming 时需要更长）
+# write: 发送请求超时
+# pool: 从连接池获取连接超时
+DEFAULT_TIMEOUT = httpx.Timeout(
+    connect=30.0,
+    read=300.0,  # streaming 响应可能持续较长时间
+    write=30.0,
+    pool=30.0,
+)
 
 # Aliyun DashScope 模型映射
 ALIYUN_MODELS = {
     "qwen-max": "qwen-max",
+    "qwen3-max": "qwen3-max",
     "kimi-k2-thinking": "kimi-k2-thinking",
     "deepseek-v3.2": "deepseek-v3.2",
 }
@@ -25,6 +39,11 @@ DEFAULT_ALIYUN_MODEL = "qwen-max"
 
 # OpenRouter 配置
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_MODELS = {
+    "claude-sonnet-4.5": "anthropic/claude-sonnet-4.5",
+    "gpt-5": "openai/gpt-5",
+    "gemini-3-flash": "google/gemini-3-flash-preview",
+}
 DEFAULT_OPENROUTER_MODEL = "anthropic/claude-sonnet-4.5"
 
 
@@ -70,23 +89,41 @@ def create_llm(
             base_url=base_url,
             extra_body=extra_body,
             streaming=True,
+            max_retries=5,  # SDK 层面自动重试
+            timeout=DEFAULT_TIMEOUT,  # 细粒度超时配置
         )
     elif model_provider == "openai":
-        return ChatOpenAI(model=model_name or "gpt-4o")
+        return ChatOpenAI(
+            model=model_name or "gpt-4o",
+            max_retries=5,
+            timeout=DEFAULT_TIMEOUT,
+        )
     elif model_provider == "anthropic":
-        return ChatAnthropic(model=model_name or "claude-sonnet-4-20250514")
+        return ChatAnthropic(
+            model=model_name or "claude-sonnet-4-20250514",
+            max_retries=5,
+            timeout=DEFAULT_TIMEOUT,
+        )
     elif model_provider == "openrouter":
         api_key = os.getenv("OPENROUTER_API_KEY")
         if not api_key:
             raise ValueError("OPENROUTER_API_KEY environment variable not set")
 
-        resolved_model = model_name or DEFAULT_OPENROUTER_MODEL
+        # 支持简短别名（如 "gpt-5"）或完整模型名（如 "openai/gpt-5"）
+        resolved_model = model_name
+        if model_name in OPENROUTER_MODELS:
+            resolved_model = OPENROUTER_MODELS[model_name]
+        elif model_name is None:
+            resolved_model = DEFAULT_OPENROUTER_MODEL
 
         return ChatOpenAI(
             model=resolved_model,
             api_key=api_key,
             base_url=OPENROUTER_BASE_URL,
             streaming=True,
+            # 增加重试次数和超时配置以应对 OpenRouter 连接不稳定
+            max_retries=5,  # SDK 层面自动重试
+            timeout=DEFAULT_TIMEOUT,  # 细粒度超时配置
             default_headers={
                 "HTTP-Referer": os.getenv("OPENROUTER_REFERER", ""),
                 "X-Title": os.getenv("OPENROUTER_APP_TITLE", "Research Agent"),

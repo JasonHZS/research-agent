@@ -189,6 +189,55 @@ ALIYUN_API_KEY=your-aliyun-dashscope-api-key
 JINA_API_KEY=your-jina-api-key
 ```
 
+## Web UI & API
+
+本项目提供了 Web UI 和后端 API 服务，支持通过浏览器使用 research agent。
+
+### 启动后端 API
+
+后端使用 FastAPI，提供 RESTful API 和 streaming 支持。
+
+```bash
+# 使用 uvicorn 启动（开发模式，支持热重载）
+uvicorn src.api.main:app --reload --port 8000
+
+# 或者使用 python 模块方式
+python -m src.api.main
+
+# 使用 LangGraph CLI（推荐，支持 LangGraph Studio）
+langgraph dev
+```
+
+API 服务默认运行在 `http://localhost:8000`，可通过环境变量配置：
+
+```bash
+API_HOST=0.0.0.0  # 默认 0.0.0.0
+API_PORT=8000     # 默认 8000
+```
+
+### 启动前端 UI
+
+前端使用 Next.js 构建，位于 `web-ui/` 目录。
+
+```bash
+# 进入前端目录
+cd web-ui
+
+# 安装依赖（首次运行）
+npm install
+
+# 启动开发服务器
+npm run dev
+
+# 或者构建生产版本
+npm run build
+npm run start
+```
+
+前端开发服务器默认运行在 `http://localhost:3000`。
+
+**重要提示**：前端需要连接到后端 API，请确保后端服务已经启动。
+
 ## Usage
 
 ### Interactive Mode

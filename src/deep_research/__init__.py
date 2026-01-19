@@ -9,6 +9,7 @@ Deep Research Module
 - AgentState: 主图状态
 - Section: 报告章节模型
 - ResearcherState: researcher 节点状态
+- ClarificationStatus: 澄清状态模型
 """
 
 from .graph import build_deep_research_graph, run_deep_research
@@ -16,6 +17,7 @@ from .state import (
     AgentInputState,
     AgentOutputState,
     AgentState,
+    ClarificationStatus,
     DeepResearchConfig,
     ResearcherOutputState,
     ResearcherState,
@@ -30,6 +32,7 @@ __all__ = [
     "AgentState",
     "AgentInputState",
     "AgentOutputState",
+    "ClarificationStatus",
     "ResearcherState",
     "ResearcherOutputState",
     "DeepResearchConfig",

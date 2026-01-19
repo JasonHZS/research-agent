@@ -208,6 +208,7 @@ async def _compress_and_output_node(
 
     return {
         "sections": [completed_section],
+        "tool_calls_log": researcher_messages,  # 传递工具调用日志到主图
     }
 
 
