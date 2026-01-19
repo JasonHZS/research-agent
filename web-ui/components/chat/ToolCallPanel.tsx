@@ -47,6 +47,12 @@ function ToolCallItem({ toolCall }: ToolCallItemProps) {
   const isRunning = toolCall.status === 'running';
   const isCompleted = toolCall.status === 'completed';
   const isFailed = toolCall.status === 'failed';
+  const resultText =
+    toolCall.result === undefined || toolCall.result === null
+      ? ''
+      : typeof toolCall.result === 'string'
+        ? toolCall.result
+        : JSON.stringify(toolCall.result, null, 2);
 
   // Format arguments for display
   const argsString = toolCall.args
@@ -104,9 +110,9 @@ function ToolCallItem({ toolCall }: ToolCallItemProps) {
           )}
 
           {/* Result (if completed) */}
-          {isCompleted && toolCall.result && (
+          {isCompleted && resultText && (
             <div className="mt-2 text-muted-foreground bg-muted/30 p-2 rounded border border-border/50 whitespace-pre-wrap max-h-60 overflow-y-auto">
-              {toolCall.result}
+              {resultText}
             </div>
           )}
         </div>

@@ -25,6 +25,7 @@ from src.prompts import load_prompt
 
 from ..state import AgentState, ClarificationStatus, DeepResearchConfig
 from ..structured_outputs import ClarifyWithUser
+from ..utils.display import render_tool_calls
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
 
@@ -43,6 +44,7 @@ def _get_config(config: RunnableConfig) -> DeepResearchConfig:
         model_name=configurable.get("model_name"),
         enable_thinking=configurable.get("enable_thinking", False),
         allow_clarification=configurable.get("allow_clarification", True),
+        verbose=configurable.get("verbose", False),
     )
 
 
@@ -112,18 +114,29 @@ async def clarify_with_user_node(
         ),
     ]
 
+    # 收集工具调用日志（用于前端显示）
+    clarify_tool_calls_log: list = []
+
     for i in range(max_iterations):
         response = await llm_with_tools.ainvoke(tool_messages)
 
         if not response.tool_calls:
             break
 
+        # CLI verbose 模式打印（复用统一格式）
+        if deep_config.verbose:
+            render_tool_calls(
+                response.tool_calls, verbose=True, section_title="Clarify"
+            )
+
+        # 收集 AIMessage (with tool_calls) 用于前端显示
+        clarify_tool_calls_log.append(response)
+
         # 执行工具调用
         tool_results = []
         for tool_call in response.tool_calls:
             tool = next((t for t in tools if t.name == tool_call["name"]), None)
             if tool:
-                print(f"  [Clarify] 执行搜索: {tool_call['args'].get('query', '')}")
                 result = await tool.ainvoke(tool_call["args"])
                 tool_results.append(
                     ToolMessage(
@@ -132,6 +145,9 @@ async def clarify_with_user_node(
                     )
                 )
                 search_context += result + "\n\n"
+
+        # 收集 ToolMessage 用于前端显示
+        clarify_tool_calls_log.extend(tool_results)
 
         # 追加到消息历史
         tool_messages.append(response)
@@ -179,6 +195,7 @@ async def clarify_with_user_node(
                     verification="",
                 ),
                 "original_query": original_query,
+                "tool_calls_log": clarify_tool_calls_log,
             },
         )
     else:
@@ -193,5 +210,6 @@ async def clarify_with_user_node(
                     verification=result.verification,
                 ),
                 "original_query": original_query,
+                "tool_calls_log": clarify_tool_calls_log,
             },
         )

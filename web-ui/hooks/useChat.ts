@@ -214,37 +214,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  // Add tool call start
+  // Add tool call start - append chronologically
   addToolCallStart: (toolCall: ToolCall) => {
     const { streamingMessage } = get();
     if (streamingMessage) {
       const segments = [...streamingMessage.segments];
       const lastSegment = segments[segments.length - 1];
-      
-      // Determine if this is a new batch or same batch
-      let shouldCreateNewSegment = true;
-      
+
+      // Chronological append:
+      // - If last segment is tool_calls with all running status, add to it (batch)
+      // - Otherwise create a new tool_calls segment at the end
       if (lastSegment?.type === 'tool_calls') {
-        // Check if all tools in the last segment are still running
-        // If so, this is part of the same batch
         const allRunning = lastSegment.toolCalls.every(tc => tc.status === 'running');
         if (allRunning) {
-          shouldCreateNewSegment = false;
+          // Batch with the current tool_calls segment
+          segments[segments.length - 1] = {
+            ...lastSegment,
+            toolCalls: [...lastSegment.toolCalls, toolCall],
+          };
+        } else {
+          // Previous tool calls completed, start a new segment
+          segments.push({ type: 'tool_calls', toolCalls: [toolCall] });
         }
-      }
-      
-      if (shouldCreateNewSegment) {
-        // Create new tool_calls segment
-        segments.push({ type: 'tool_calls', toolCalls: [toolCall] });
       } else {
-        // Append to existing tool_calls segment (same batch)
-        const lastToolCallsSegment = lastSegment as { type: 'tool_calls'; toolCalls: ToolCall[] };
-        segments[segments.length - 1] = {
-          ...lastToolCallsSegment,
-          toolCalls: [...lastToolCallsSegment.toolCalls, toolCall],
-        };
+        // Last segment is text or empty, append new tool_calls segment
+        segments.push({ type: 'tool_calls', toolCalls: [toolCall] });
       }
-      
+
       set({
         streamingMessage: {
           ...streamingMessage,
@@ -291,9 +287,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setClarification: (question: string) => {
     const { streamingMessage } = get();
     if (streamingMessage) {
-      // Create a text segment with the clarification question
-      const segments: MessageSegment[] = [{ type: 'text', content: question }];
-      
+      // Preserve existing tool call segments, append clarification text
+      const segments = [...streamingMessage.segments];
+      const lastSegment = segments[segments.length - 1];
+
+      if (!lastSegment) {
+        segments.push({ type: 'text', content: question });
+      } else if (lastSegment.type === 'text') {
+        segments[segments.length - 1] = {
+          ...lastSegment,
+          content: question,
+        };
+      } else {
+        segments.push({ type: 'text', content: question });
+      }
+
       set({
         streamingMessage: {
           ...streamingMessage,
@@ -311,10 +319,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (streamingMessage) {
       // Format brief as markdown
       const sectionsText = brief.sections
-        .map((s, i) => `${i + 1}. **${s.title}**\n   ${s.description}`)
+        .map((s, i) => `### ${i + 1}. ${s.title}\n\n${s.description}`)
         .join('\n\n');
       
-      const briefContent = `**研究大纲**\n\n${sectionsText}`;
+      const briefContent = `## 研究大纲\n\n${sectionsText}`;
       
       // Append brief to existing content or create new
       const newContent = streamingMessage.content 

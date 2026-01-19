@@ -1,6 +1,7 @@
 """Agent service - Bridge between API and research agent."""
 
 import asyncio
+import json
 from collections.abc import AsyncGenerator
 from typing import Any, Optional
 
@@ -119,6 +120,20 @@ class AgentService:
         self._agent_configs.pop(conversation_id, None)
 
     @staticmethod
+    def _format_tool_result(content: Any, max_len: int = 500) -> str:
+        """Normalize tool result to a short, display-friendly string."""
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            text = content
+        else:
+            try:
+                text = json.dumps(content, ensure_ascii=False, default=str)
+            except TypeError:
+                text = str(content)
+        return text[:max_len] if max_len and len(text) > max_len else text
+
+    @staticmethod
     def _is_stream_disconnect_error(exc: Exception) -> bool:
         """Return True when upstream closes streaming response early."""
         if isinstance(exc, (httpx.RemoteProtocolError, httpcore.RemoteProtocolError)):
@@ -133,6 +148,57 @@ class AgentService:
             return True
 
         return False
+
+
+    @staticmethod
+    def _extract_messages_recursive(data: Any, max_depth: int = 5) -> list:
+        """
+        Recursively extract messages from nested node data.
+
+        This handles subgraph updates where data may be nested like:
+        {"researcher": {"researcher": {"researcher_messages": [...]}}}
+
+        Looks for these fields:
+        - messages: standard LangGraph messages
+        - researcher_messages: from researcher subgraph
+        - tool_calls_log: from clarify node's internal tool calls
+
+        Args:
+            data: Node data (dict or nested structure)
+            max_depth: Maximum recursion depth to prevent infinite loops
+
+        Returns:
+            List of message objects containing tool calls
+        """
+        if max_depth <= 0 or data is None:
+            return []
+
+        # Handle LangGraph's Overwrite object
+        if hasattr(data, "value"):
+            data = data.value
+
+        if not isinstance(data, dict):
+            return []
+
+        all_messages = []
+        message_fields = ["messages", "researcher_messages", "tool_calls_log"]
+
+        for key, value in data.items():
+            # Handle Overwrite wrapper
+            if hasattr(value, "value"):
+                value = value.value
+
+            if key in message_fields:
+                # Found a message field - extract messages
+                if isinstance(value, (list, tuple)):
+                    all_messages.extend(value)
+            elif isinstance(value, dict):
+                # Recurse into nested dicts (subgraph updates)
+                all_messages.extend(
+                    AgentService._extract_messages_recursive(value, max_depth - 1)
+                )
+
+        return all_messages
 
     async def stream_response(
         self,
@@ -162,7 +228,8 @@ class AgentService:
         try:
             state = agent.get_state(config)
             if state and state.values:
-                for msg in state.values.get("messages", []):
+                existing_messages = self._extract_messages_recursive(state.values)
+                for msg in existing_messages:
                     if hasattr(msg, "tool_calls") and msg.tool_calls:
                         for tc in msg.tool_calls:
                             tool_id = tc.get("id", "")
@@ -183,11 +250,25 @@ class AgentService:
         clarification_sent = False
         brief_sent = False
 
+        extra_config = None
+        log_tool_calls = False
+        completed_tool_ids: set[str] = set()
+
         try:
+            # For Deep Research: enable verbose mode to print tool calls in backend
+            if is_deep_research:
+                extra_config = {
+                    "verbose": True,
+                    "model_provider": model_provider,
+                    "model_name": model_name,
+                }
+            log_tool_calls = bool(extra_config and extra_config.get("verbose"))
+            
             async for mode, chunk in run_research_stream(
                 query=message,
                 agent=agent,
                 thread_id=conversation_id,
+                extra_config=extra_config,
             ):
                 if mode == "messages":
                     # Token streaming - only forward AI messages to avoid leaking tool output
@@ -196,16 +277,18 @@ class AgentService:
                         # Skip tool/system messages to prevent raw tool output from reaching UI
                         continue
                     
-                    # For Deep Research: skip tokens from nodes that use structured output
-                    # These nodes output JSON which should not be displayed in the UI:
-                    # - clarify: ClarifyWithUser (handled via clarification_status)
-                    # - analyze: QueryAnalysis (internal routing decision)
-                    # - plan_sections: ResearchBrief (handled via BRIEF event)
-                    # - review: ReviewResult (internal evaluation, logged to backend only)
+                    # For Deep Research: only allow tokens from specific nodes
+                    # Use whitelist approach - only final_report text should be displayed:
+                    # - final_report: The main research report (displayed to user)
+                    # All other nodes are filtered:
+                    # - clarify, analyze, plan_sections, review: structured JSON output
+                    # - researcher, researcher_tools, compress_output: subgraph internal reasoning
+                    # - discover, discover_tools, extract_output: subgraph internal reasoning
+                    # - aggregate: utility node with debug logs
                     if is_deep_research:
                         current_node = metadata.get("langgraph_node", "")
-                        structured_output_nodes = {"clarify", "analyze", "plan_sections", "review"}
-                        if current_node in structured_output_nodes:
+                        allowed_text_nodes = {"final_report"}
+                        if current_node not in allowed_text_nodes:
                             continue
 
                     if hasattr(message_chunk, "content") and message_chunk.content:
@@ -236,6 +319,9 @@ class AgentService:
                     for node_name, node_data in chunk.items():
                         if node_data is None:
                             continue
+                        tool_calls_log = node_data.get("tool_calls_log") if isinstance(node_data, dict) else None
+                        if hasattr(tool_calls_log, "value"):
+                            tool_calls_log = tool_calls_log.value
 
                         # For Deep Research: check clarification_status field directly
                         # This is set by the clarify node via Command API
@@ -310,17 +396,11 @@ class AgentService:
                                     )
                                     brief_sent = True
 
-                        messages = node_data.get("messages", [])
-
-                        # Handle LangGraph's Overwrite object
-                        if hasattr(messages, "value"):
-                            messages = messages.value
-
-                        # Ensure messages is iterable
-                        if not isinstance(messages, (list, tuple)):
-                            continue
-
-                        for msg in messages:
+                        # Extract all possible message sources containing tool calls
+                        # Recursively search for message fields in nested node data
+                        # (handles subgraph updates like {"researcher": {"researcher": {...}}})
+                        all_messages = self._extract_messages_recursive(node_data)
+                        for msg in all_messages:
                             # Check for tool calls in AI messages
                             if hasattr(msg, "tool_calls") and msg.tool_calls:
                                 for tc in msg.tool_calls:
@@ -341,6 +421,11 @@ class AgentService:
                                     )
                                     active_tool_calls[tool_id] = tool_call
 
+                                    if log_tool_calls:
+                                        print(
+                                            f"  [Tool Call] {tool_call.name}: {tool_call.args}"
+                                        )
+
                                     yield StreamEvent(
                                         type=StreamEventType.TOOL_CALL_START,
                                         data=tool_call.model_dump(),
@@ -349,12 +434,20 @@ class AgentService:
                             # Check for tool results
                             if hasattr(msg, "type") and msg.type == "tool":
                                 tool_id = getattr(msg, "tool_call_id", None)
-                                if tool_id and tool_id in active_tool_calls:
+                                if (
+                                    tool_id
+                                    and tool_id in active_tool_calls
+                                    and tool_id not in completed_tool_ids
+                                ):
                                     tool_call = active_tool_calls[tool_id]
                                     tool_call.status = ToolCallStatus.COMPLETED
-                                    tool_call.result = (
-                                        msg.content[:500] if msg.content else ""
-                                    )  # Truncate for display
+                                    tool_call.result = self._format_tool_result(
+                                        getattr(msg, "content", None)
+                                    )
+
+                                    completed_tool_ids.add(tool_id)
+                                    if log_tool_calls:
+                                        print(f"  [Tool Done] {tool_call.name} ✓")
 
                                     yield StreamEvent(
                                         type=StreamEventType.TOOL_CALL_END,
@@ -399,6 +492,106 @@ class AgentService:
                             yield StreamEvent(
                                 type=StreamEventType.TOKEN,
                                 data={"content": final_text},
+                            )
+                        # Try to emit brief from state in non-streaming fallback
+                        if is_deep_research and not brief_sent:
+                            try:
+                                fallback_state = agent.get_state(
+                                    {"configurable": {"thread_id": conversation_id}}
+                                )
+                                if fallback_state and fallback_state.values:
+                                    research_brief = fallback_state.values.get("research_brief")
+                                    sections = fallback_state.values.get("sections")
+                                    if hasattr(research_brief, "value"):
+                                        research_brief = research_brief.value
+                                    if hasattr(sections, "value"):
+                                        sections = sections.value
+                                    if research_brief and sections:
+                                        section_list = []
+                                        for s in sections:
+                                            if isinstance(s, Section):
+                                                section_list.append(
+                                                    {
+                                                        "title": s.title,
+                                                        "description": s.description,
+                                                    }
+                                                )
+                                            elif isinstance(s, dict):
+                                                section_list.append(
+                                                    {
+                                                        "title": s.get("title", ""),
+                                                        "description": s.get("description", ""),
+                                                    }
+                                                )
+                                        if section_list:
+                                            yield StreamEvent(
+                                                type=StreamEventType.BRIEF,
+                                                data={
+                                                    "research_brief": research_brief,
+                                                    "sections": section_list,
+                                                },
+                                            )
+                                            brief_sent = True
+                            except Exception:
+                                pass
+                        # Try to emit tool calls from state in non-streaming fallback
+                        try:
+                            fallback_state = agent.get_state(
+                                {"configurable": {"thread_id": conversation_id}}
+                            )
+                            if fallback_state and fallback_state.values:
+                                fallback_messages = self._extract_messages_recursive(
+                                    fallback_state.values
+                                )
+                                for msg in fallback_messages:
+                                    if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                        for tc in msg.tool_calls:
+                                            tool_id = tc.get("id", f"tc_{tool_call_counter}")
+                                            if tool_id in seen_tool_ids:
+                                                continue
+                                            seen_tool_ids.add(tool_id)
+                                            tool_call_counter += 1
+
+                                            tool_call = ToolCall(
+                                                id=tool_id,
+                                                name=tc.get("name", "unknown"),
+                                                args=tc.get("args", {}),
+                                                status=ToolCallStatus.RUNNING,
+                                            )
+                                            active_tool_calls[tool_id] = tool_call
+                                            if log_tool_calls:
+                                                print(
+                                                    "  [Tool Call] "
+                                                    f"{tool_call.name}: {tool_call.args}"
+                                                )
+                                            yield StreamEvent(
+                                                type=StreamEventType.TOOL_CALL_START,
+                                                data=tool_call.model_dump(),
+                                            )
+
+                                    if hasattr(msg, "type") and msg.type == "tool":
+                                        tool_id = getattr(msg, "tool_call_id", None)
+                                        if (
+                                            tool_id
+                                            and tool_id in active_tool_calls
+                                            and tool_id not in completed_tool_ids
+                                        ):
+                                            tool_call = active_tool_calls[tool_id]
+                                            tool_call.status = ToolCallStatus.COMPLETED
+                                            tool_call.result = self._format_tool_result(
+                                                getattr(msg, "content", None)
+                                            )
+                                            completed_tool_ids.add(tool_id)
+                                            if log_tool_calls:
+                                                print(f"  [Tool Done] {tool_call.name} ✓")
+                                            yield StreamEvent(
+                                                type=StreamEventType.TOOL_CALL_END,
+                                                data=tool_call.model_dump(),
+                                            )
+                        except Exception as fallback_state_error:
+                            print(
+                                "Warning: Could not emit tool calls from fallback state: "
+                                f"{fallback_state_error}"
                             )
                         is_clarification = clarification_sent
                         if is_deep_research and not is_clarification:

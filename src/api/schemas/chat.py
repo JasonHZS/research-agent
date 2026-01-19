@@ -29,7 +29,7 @@ class ToolCall(BaseModel):
     id: str
     name: str
     args: dict[str, Any] = Field(default_factory=dict)
-    result: Optional[str] = None
+    result: Optional[Any] = None
     status: ToolCallStatus = ToolCallStatus.RUNNING
 
 

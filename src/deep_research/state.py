@@ -154,6 +154,12 @@ class AgentState(MessagesState):
     # 由 clarify 节点设置，传递结构化的澄清决策
     clarification_status: Optional[ClarificationStatus] = None
 
+    # === 工具调用日志 ===
+    # 用于前端显示工具调用，不影响对话历史
+    # 存储 AIMessage (with tool_calls) 和 ToolMessage
+    # 使用 operator.add 累积来自多个节点（clarify、多个 researcher）的工具调用
+    tool_calls_log: Annotated[list[AnyMessage], operator.add] = []
+
     # === 查询分析 ===
     # 查询类型: list (有哪些) / comparison (对比) / deep_dive (深入) / general (一般)
     query_type: Literal["list", "comparison", "deep_dive", "general"] = "general"
@@ -213,6 +219,7 @@ class ResearcherOutputState(TypedDict):
     """researcher 返回给主图的输出状态"""
 
     sections: list[Section]  # 更新后的 section (status=completed, content 已填充)
+    tool_calls_log: list[AnyMessage]  # 工具调用日志（用于前端显示）
 
 
 # ==============================================================================
