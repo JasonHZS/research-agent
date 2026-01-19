@@ -31,41 +31,6 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 
 ## Architecture
 
-```
-src/
-├── agent/
-│   ├── research_agent.py         # Normal mode agent with LangGraph
-│   └── subagents/
-│       └── content_reader_agent.py  # Sub-agent for content reading
-├── deep_research/                # Deep Research Mode (Section-based)
-│   ├── graph.py                  # Main graph construction
-│   ├── state.py                  # State definitions (Section, AgentState, etc.)
-│   ├── structured_outputs.py     # Pydantic models for structured LLM outputs
-│   ├── nodes/                    # Graph nodes
-│   │   ├── clarify.py            # Intent clarification node
-│   │   ├── analyze.py            # Query type analysis node
-│   │   ├── discover.py           # Entity discovery node (for list queries)
-│   │   ├── brief.py              # Section planning node
-│   │   ├── researcher.py         # Researcher subgraph (parallel execution)
-│   │   ├── review.py             # Evidence review node
-│   │   └── report.py             # Final report generation node
-│   └── utils/                    # Utilities (compression, LLM, tools, state)
-├── config/
-│   ├── mcp_config.py             # MCP server configurations
-│   ├── deep_research_config.py   # Deep Research configuration
-│   └── reader_config.py          # Content reader tool configuration
-├── prompts/
-│   ├── loader.py                 # Jinja2 template loader
-│   └── templates/                # Markdown prompt templates
-├── tools/
-│   ├── arxiv_api.py              # ArXiv API search and fetch tools
-│   ├── hf_blog.py                # Hugging Face blog listing tool
-│   ├── hf_daily_papers.py        # Hugging Face daily papers tool
-│   ├── jina_reader.py            # Jina AI web reader tool
-│   └── zyte_reader.py            # Zyte API article extraction tool
-└── main.py                       # CLI entry point
-```
-
 ### Deep Research Graph Flow
 
 ```mermaid
@@ -191,52 +156,52 @@ JINA_API_KEY=your-jina-api-key
 
 ## Web UI & API
 
-本项目提供了 Web UI 和后端 API 服务，支持通过浏览器使用 research agent。
+This project provides a Web UI and backend API service, allowing you to use the research agent through a web browser.
 
-### 启动后端 API
+### Starting the Backend API
 
-后端使用 FastAPI，提供 RESTful API 和 streaming 支持。
+The backend uses FastAPI and provides RESTful API and streaming support.
 
 ```bash
-# 使用 uvicorn 启动（开发模式，支持热重载）
+# Start with uvicorn (development mode with hot reload)
 uvicorn src.api.main:app --reload --port 8000
 
-# 或者使用 python 模块方式
+# Or use Python module approach
 python -m src.api.main
 
-# 使用 LangGraph CLI（推荐，支持 LangGraph Studio）
+# Use LangGraph CLI (recommended, supports LangGraph Studio)
 langgraph dev
 ```
 
-API 服务默认运行在 `http://localhost:8000`，可通过环境变量配置：
+The API service runs on `http://localhost:8000` by default. You can configure it via environment variables:
 
 ```bash
-API_HOST=0.0.0.0  # 默认 0.0.0.0
-API_PORT=8000     # 默认 8000
+API_HOST=0.0.0.0  # Default 0.0.0.0
+API_PORT=8000     # Default 8000
 ```
 
-### 启动前端 UI
+### Starting the Frontend UI
 
-前端使用 Next.js 构建，位于 `web-ui/` 目录。
+The frontend is built with Next.js and located in the `web-ui/` directory.
 
 ```bash
-# 进入前端目录
+# Navigate to the frontend directory
 cd web-ui
 
-# 安装依赖（首次运行）
+# Install dependencies (first time only)
 npm install
 
-# 启动开发服务器
+# Start the development server
 npm run dev
 
-# 或者构建生产版本
+# Or build for production
 npm run build
 npm run start
 ```
 
-前端开发服务器默认运行在 `http://localhost:3000`。
+The frontend development server runs on `http://localhost:3000` by default.
 
-**重要提示**：前端需要连接到后端 API，请确保后端服务已经启动。
+**Important**: The frontend needs to connect to the backend API, so make sure the backend service is running first.
 
 ## Usage
 
