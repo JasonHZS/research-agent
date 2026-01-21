@@ -26,6 +26,7 @@ from src.api.schemas.chat import (
     ToolCall,
     ToolCallStatus,
 )
+from src.config.deep_research_config import get_max_concurrent_researchers
 from src.config.llm_factory import ALIYUN_MODELS, OPENROUTER_MODELS
 
 
@@ -251,6 +252,7 @@ class AgentService:
         brief_sent = False
 
         extra_config = None
+        max_concurrency = None
         log_tool_calls = False
         completed_tool_ids: set[str] = set()
 
@@ -262,6 +264,7 @@ class AgentService:
                     "model_provider": model_provider,
                     "model_name": model_name,
                 }
+                max_concurrency = get_max_concurrent_researchers()
             log_tool_calls = bool(extra_config and extra_config.get("verbose"))
             
             async for mode, chunk in run_research_stream(
@@ -269,6 +272,7 @@ class AgentService:
                 agent=agent,
                 thread_id=conversation_id,
                 extra_config=extra_config,
+                max_concurrency=max_concurrency,
             ):
                 if mode == "messages":
                     # Token streaming - only forward AI messages to avoid leaking tool output

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { Plus, Sun, Moon } from 'lucide-react';
+import { GithubIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
@@ -188,6 +189,21 @@ export function ChatContainer() {
           >
             <Sun className="h-4 w-4 dark:hidden" />
             <Moon className="h-4 w-4 hidden dark:block" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            asChild
+            className="h-9 w-9"
+          >
+            <a
+              href="https://github.com/JasonHZS/research-agent"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="View on GitHub"
+            >
+              <GithubIcon className="h-5 w-5" />
+            </a>
           </Button>
         </div>
       </header>

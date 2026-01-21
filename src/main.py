@@ -190,6 +190,7 @@ async def main_deep_research(
 
     # Configuration
     config = {
+        "max_concurrency": max_concurrent,
         "configurable": {
             "thread_id": f"deep_research_{uuid.uuid4().hex[:8]}",
             "max_concurrent_researchers": max_concurrent,

@@ -342,6 +342,7 @@ async def run_research_stream(
     agent: Any,
     thread_id: Optional[str] = None,
     extra_config: Optional[dict] = None,
+    max_concurrency: Optional[int] = None,
 ) -> AsyncGenerator[tuple[str, Any], None]:
     """
     Stream research query execution with token-level streaming.
@@ -355,6 +356,7 @@ async def run_research_stream(
         agent: Pre-created agent instance (required).
         thread_id: Unique thread identifier for multi-turn conversations.
         extra_config: Additional configurable options (e.g., verbose, model_provider).
+        max_concurrency: Optional LangGraph concurrency limit for fan-out tasks.
 
     Yields:
         Tuple of (mode, chunk) where:
@@ -376,7 +378,9 @@ async def run_research_stream(
     configurable = {"thread_id": thread_id} if thread_id else {}
     if extra_config:
         configurable.update(extra_config)
-    config = {"configurable": configurable} if configurable else {}
+    config: dict[str, Any] = {"configurable": configurable} if configurable else {}
+    if max_concurrency is not None:
+        config["max_concurrency"] = max_concurrency
 
     # Use mixed mode: "updates" for tool calls, "messages" for token streaming
     async for mode, chunk in agent.astream(
