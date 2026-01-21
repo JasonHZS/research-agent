@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Send, StopCircle, Loader2, Sparkles, Newspaper, ScrollText, ArrowRight } from 'lucide-react';
+import { Send, StopCircle, Loader2, Newspaper, ScrollText, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ModelSelector } from '@/components/sidebar/ModelSelector';
 import { cn } from '@/lib/utils';

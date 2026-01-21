@@ -25,6 +25,9 @@ from typing import Optional
 import structlog
 from structlog.types import Processor
 
+# Module-level flag to prevent duplicate configuration
+_configured = False
+
 
 def _is_production() -> bool:
     """Check if running in production environment."""
@@ -51,6 +54,11 @@ def configure_logging(
         log_level: Logging level. If None, read from LOG_LEVEL env var (default: INFO).
         log_file: Log file path for production (defaults to LOG_FILE or logs/app.log).
     """
+    global _configured
+    if _configured:
+        return
+    _configured = True
+
     # Determine output format
     if json_format is None:
         json_format = _is_production()

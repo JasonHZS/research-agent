@@ -198,6 +198,49 @@ class AgentService:
 
         return False
 
+    @staticmethod
+    def _sanitize_tool_args(args: Any) -> Any:
+        """
+        Filter sensitive information from tool arguments before logging.
+
+        Args:
+            args: Tool arguments (dict, string, or other)
+
+        Returns:
+            Sanitized arguments with sensitive values redacted
+        """
+        if not args:
+            return args
+
+        sensitive_keys = ["key", "token", "secret", "password", "credential", "auth"]
+
+        # Handle dict args directly
+        if isinstance(args, dict):
+            sanitized = {}
+            for k, v in args.items():
+                if any(s in k.lower() for s in sensitive_keys):
+                    sanitized[k] = "***REDACTED***"
+                else:
+                    sanitized[k] = v
+            return sanitized
+
+        # Handle string args (may be JSON)
+        if isinstance(args, str):
+            try:
+                parsed = json.loads(args)
+                if isinstance(parsed, dict):
+                    sanitized = {}
+                    for k, v in parsed.items():
+                        if any(s in k.lower() for s in sensitive_keys):
+                            sanitized[k] = "***REDACTED***"
+                        else:
+                            sanitized[k] = v
+                    return json.dumps(sanitized)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        return args
+
 
     @staticmethod
     def _extract_messages_recursive(data: Any, max_depth: int = 5) -> list:
@@ -472,10 +515,12 @@ class AgentService:
                                     seen_tool_ids.add(tool_id)
                                     tool_call_counter += 1
 
+                                    # Sanitize args to prevent sensitive data leakage to clients
+                                    sanitized_args = self._sanitize_tool_args(tc.get("args", {}))
                                     tool_call = ToolCall(
                                         id=tool_id,
                                         name=tc.get("name", "unknown"),
-                                        args=tc.get("args", {}),
+                                        args=sanitized_args,
                                         status=ToolCallStatus.RUNNING,
                                     )
                                     active_tool_calls[tool_id] = tool_call
@@ -486,7 +531,7 @@ class AgentService:
                                         "Tool call started",
                                         tool_id=tool_id,
                                         tool_name=tool_call.name,
-                                        tool_args=tool_call.args,
+                                        tool_args=sanitized_args,
                                         conversation_id=conversation_id,
                                     )
 
@@ -648,10 +693,12 @@ class AgentService:
                                             seen_tool_ids.add(tool_id)
                                             tool_call_counter += 1
 
+                                            # Sanitize args to prevent sensitive data leakage to clients
+                                            sanitized_args = self._sanitize_tool_args(tc.get("args", {}))
                                             tool_call = ToolCall(
                                                 id=tool_id,
                                                 name=tc.get("name", "unknown"),
-                                                args=tc.get("args", {}),
+                                                args=sanitized_args,
                                                 status=ToolCallStatus.RUNNING,
                                             )
                                             active_tool_calls[tool_id] = tool_call
@@ -661,7 +708,7 @@ class AgentService:
                                                 "Tool call started (fallback)",
                                                 tool_id=tool_id,
                                                 tool_name=tool_call.name,
-                                                tool_args=tool_call.args,
+                                                tool_args=sanitized_args,
                                                 conversation_id=conversation_id,
                                             )
                                             yield StreamEvent(
