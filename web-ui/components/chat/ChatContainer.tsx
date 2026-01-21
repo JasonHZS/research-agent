@@ -233,6 +233,7 @@ export function ChatContainer() {
               placeholder={isDeepResearch ? "Deep Research Mode enabled..." : "Explore cutting-edge AI research..."}
               isDeepResearch={isDeepResearch}
               onToggleDeepResearch={toggleDeepResearch}
+              showExamples={true}
             />
           </div>
         ) : (
@@ -247,6 +248,7 @@ export function ChatContainer() {
               placeholder={isDeepResearch ? "Deep Research Mode enabled..." : "Explore cutting-edge AI research..."}
               isDeepResearch={isDeepResearch}
               onToggleDeepResearch={toggleDeepResearch}
+              showExamples={false}
             />
           </>
         )}

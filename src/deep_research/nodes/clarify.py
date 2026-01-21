@@ -153,6 +153,11 @@ async def clarify_with_user_node(
         tool_messages.append(response)
         tool_messages.extend(tool_results)
 
+        logger.debug(
+            "Clarify search iteration completed",
+            iteration=i + 1,
+            max_iterations=max_iterations,
+        )
         print(f"  [Clarify] 搜索迭代 {i + 1}/{max_iterations} 完成")
 
     # 使用结构化输出提取最终决策（直接传字符串，和原版一致）
@@ -168,6 +173,11 @@ async def clarify_with_user_node(
         result: ClarifyWithUser = await llm_structured.ainvoke(final_prompt)
     except Exception as e:
         # 回退：默认不需要澄清
+        logger.warning(
+            "Clarify result extraction failed",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
         print(f"  [Clarify] 结果提取失败: {e}")
         result = ClarifyWithUser(
             need_clarification=False,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Send, StopCircle, Loader2 } from 'lucide-react';
+import { Send, StopCircle, Loader2, Sparkles, Newspaper, ScrollText, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ModelSelector } from '@/components/sidebar/ModelSelector';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ interface InputAreaProps {
   className?: string;
   isDeepResearch?: boolean;
   onToggleDeepResearch?: () => void;
+  showExamples?: boolean;
 }
 
 export function InputArea({
@@ -26,6 +27,7 @@ export function InputArea({
   className,
   isDeepResearch = false,
   onToggleDeepResearch,
+  showExamples = false,
 }: InputAreaProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -149,6 +151,67 @@ export function InputArea({
           Press <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Enter</kbd> to send,{' '}
           <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Shift + Enter</kbd> for new line
         </p>
+
+        {/* Example Queries */}
+        {showExamples && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 px-4 max-w-2xl mx-auto">
+          <button
+            onClick={() => setInput('今天 hacker news 上有什么关于 AI 的帖子， 帮我总结一下其主要内容和评论区')}
+            className="group relative overflow-hidden rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:scale-[1.01] border border-orange-200/50 dark:border-orange-800/30"
+          >
+            {/* Gradient Background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-100/80 via-amber-50/50 to-orange-50/80 dark:from-orange-900/20 dark:via-amber-900/10 dark:to-orange-900/20 opacity-100 transition-opacity" />
+            
+            <div className="relative z-10 flex flex-col h-full justify-between">
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-orange-950 dark:text-orange-50 font-serif tracking-tight">
+                  Hacker News 热点
+                </h3>
+                <p className="text-xs font-medium text-orange-900/70 dark:text-orange-100/60 leading-relaxed">
+                  探索今日关于 AI 的热门讨论与社区洞见。
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-2 mt-auto">
+                <div className="p-1.5 bg-orange-500/10 rounded-full backdrop-blur-sm group-hover:bg-orange-500/20 transition-colors">
+                   <Newspaper className="w-3.5 h-3.5 text-orange-700 dark:text-orange-300" />
+                </div>
+                <span className="text-[10px] font-semibold text-orange-800 dark:text-orange-200 flex items-center gap-1">
+                  探索趋势 <ArrowRight className="w-2.5 h-2.5 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all duration-300" />
+                </span>
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setInput('最近一周huggingface 上的 top5 paper 都有哪些？帮我总结一下')}
+            className="group relative overflow-hidden rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:scale-[1.01] border border-orange-200/50 dark:border-orange-800/30"
+          >
+            {/* Gradient Background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-100/80 via-orange-50/50 to-amber-50/80 dark:from-amber-900/20 dark:via-orange-900/10 dark:to-amber-900/20 opacity-100 transition-opacity" />
+            
+            <div className="relative z-10 flex flex-col h-full justify-between">
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-amber-950 dark:text-amber-50 font-serif tracking-tight">
+                  前沿论文精选
+                </h3>
+                <p className="text-xs font-medium text-amber-900/70 dark:text-amber-100/60 leading-relaxed">
+                  总结本周 Hugging Face 上最热门的 5 篇论文。
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-2 mt-auto">
+                <div className="p-1.5 bg-amber-500/10 rounded-full backdrop-blur-sm group-hover:bg-amber-500/20 transition-colors">
+                   <ScrollText className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
+                </div>
+                <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-1">
+                  阅读总结 <ArrowRight className="w-2.5 h-2.5 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all duration-300" />
+                </span>
+              </div>
+            </div>
+          </button>
+        </div>
+        )}
       </div>
     </div>
   );

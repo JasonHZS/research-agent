@@ -13,6 +13,9 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
 from src.prompts import load_prompt
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from ..state import AgentState, DeepResearchConfig
 from ..structured_outputs import QueryAnalysis
@@ -84,6 +87,13 @@ async def analyze_query_node(
             llm_with_output = llm.with_structured_output(QueryAnalysis)
             result = await llm_with_output.ainvoke(analysis_prompt)
 
+        logger.info(
+            "Query analyzed",
+            query_type=result.query_type,
+            output_format=result.output_format,
+            needs_discovery=result.needs_discovery,
+            discovery_target=result.discovery_target,
+        )
         print(
             f"\n[Analyze]: 查询类型={result.query_type}, 输出格式={result.output_format}"
         )
@@ -108,6 +118,11 @@ async def analyze_query_node(
         )
 
     except Exception as e:
+        logger.warning(
+            "Query analysis failed, using defaults",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
         print(f"\n[Analyze]: 分析失败，使用默认值: {e}\n")
         # 回退到默认值
         return Command(

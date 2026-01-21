@@ -1,7 +1,6 @@
 """Chat routes with SSE streaming support."""
 
 import json
-import traceback
 from typing import Optional
 
 from fastapi import APIRouter
@@ -13,8 +12,10 @@ from src.api.schemas.chat import (
     StreamEventType,
 )
 from src.api.services.agent_service import get_agent_service
+from src.utils.logging_config import bind_context, get_logger
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+logger = get_logger(__name__)
 
 
 class ChatStreamRequest(BaseModel):
@@ -50,9 +51,23 @@ async def stream_chat(request: ChatStreamRequest) -> StreamingResponse:
 
     async def event_generator():
         """Generate NDJSON events from agent stream."""
+        # Bind session context for all logs in this stream
+        bind_context(session_id=request.session_id)
+
         try:
-            print(f"Starting SSE stream for session {request.session_id}")
-            print(f"Message: {request.message[:50]}... provider={request.model_provider}, model={request.model_name}")
+            # Truncate message for logging to avoid huge log entries
+            message_preview = (
+                request.message[:50] + "..."
+                if len(request.message) > 50
+                else request.message
+            )
+            logger.info(
+                "SSE stream started",
+                message_preview=message_preview,
+                model_provider=request.model_provider,
+                model_name=request.model_name,
+                is_deep_research=request.is_deep_research,
+            )
 
             async for event in agent_service.stream_response(
                 conversation_id=request.session_id,
@@ -61,21 +76,22 @@ async def stream_chat(request: ChatStreamRequest) -> StreamingResponse:
                 model_name=request.model_name,
                 is_deep_research=request.is_deep_research,
             ):
-                # Log key events only
+                # Log key events at debug level to reduce noise
                 if event.type in {
                     StreamEventType.TOOL_CALL_START,
                     StreamEventType.TOOL_CALL_END,
                     StreamEventType.MESSAGE_COMPLETE,
                     StreamEventType.ERROR,
                 }:
-                    print(f"Sending event: {event.type}")
+                    logger.debug("Sending event", event_type=event.type)
 
                 # Yield NDJSON line
                 yield json.dumps(event.model_dump()) + "\n"
 
+            logger.info("SSE stream completed")
+
         except Exception as e:
-            print(f"ERROR in SSE stream: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
+            logger.exception("SSE stream failed", error=str(e))
             # Send error event
             error_event = StreamEvent(
                 type=StreamEventType.ERROR,
@@ -98,4 +114,5 @@ async def reset_chat(request: ChatResetRequest) -> dict[str, str]:
     """Reset a chat session and clear any cached state."""
     agent_service = get_agent_service()
     agent_service.remove_agent(request.session_id)
+    logger.info("Chat session reset", session_id=request.session_id)
     return {"status": "ok"}

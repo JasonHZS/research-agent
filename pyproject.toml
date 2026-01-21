@@ -25,6 +25,8 @@ dependencies = [
     "websockets>=14.0",
     "sqlalchemy>=2.0.0",
     "aiosqlite>=0.20.0",
+    # Logging
+    "structlog>=24.0.0",
 ]
 
 [project.optional-dependencies]

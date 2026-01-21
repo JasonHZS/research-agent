@@ -14,6 +14,9 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command, Send
 
 from src.prompts import load_prompt
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from ..state import AgentState, DeepResearchConfig, DiscoveredItem, Section
 from ..structured_outputs import ResearchBrief
@@ -145,6 +148,11 @@ async def plan_sections_node(
     if existing_sections:
         # 已有 sections，说明是 review 循环回来的，跳过重新生成
         pending_sections = [s for s in existing_sections if s.status == "pending"]
+        logger.info(
+            "Brief skipped (review loop)",
+            total_sections=len(existing_sections),
+            pending_sections=len(pending_sections),
+        )
         print(
             f"\n[Brief]: 跳过重新生成（已有 {len(existing_sections)} 个章节，"
             f"{len(pending_sections)} 个待研究）\n"
@@ -172,6 +180,10 @@ async def plan_sections_node(
 
     if discovered_items:
         # 基于发现结果动态生成章节
+        logger.info(
+            "Brief from discovered items",
+            discovered_count=len(discovered_items),
+        )
         print(f"\n[Brief]: 基于前置探索结果生成章节（发现 {len(discovered_items)} 个实体）")
 
         sections, brief_text = _generate_sections_from_discovered_items(
@@ -182,6 +194,11 @@ async def plan_sections_node(
         )
 
         if sections:
+            logger.info(
+                "Brief sections generated (from discovery)",
+                section_count=len(sections),
+                section_titles=[s.title for s in sections],
+            )
             print(f"  生成 {len(sections)} 个研究章节:")
             for s in sections:
                 print(f"    - {s.title}")
@@ -224,7 +241,16 @@ async def plan_sections_node(
 
     result: ResearchBrief = await llm_with_output.ainvoke(prompt_text)
 
-    # 打印研究大纲
+    # 记录研究大纲
+    logger.info(
+        "Research brief generated",
+        title=result.title,
+        objective=result.objective,
+        scope=result.scope,
+        section_count=len(result.sections),
+        section_titles=[s.title for s in result.sections],
+    )
+    # 打印研究大纲（终端输出）
     print(f"\n[Brief]: {result.title}")
     print(f"  目标: {result.objective}")
     print(f"  范围: {result.scope}")

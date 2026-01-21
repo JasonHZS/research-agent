@@ -14,6 +14,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.types import Command
 
 from src.prompts import load_prompt
+from src.utils.logging_config import get_logger
 
 from ..state import AgentState, DeepResearchConfig, DiscoveredItem
 from ..structured_outputs import DiscoveryResult, get_researcher_tools
@@ -21,6 +22,8 @@ from ..utils.llm import get_llm
 from ..utils.state import get_state_value
 
 import operator
+
+logger = get_logger(__name__)
 from typing import Annotated
 
 
@@ -258,6 +261,12 @@ def build_discover_subgraph(tools: list) -> StateGraph:
         discover_iterations = get_state_value(state, "discover_iterations", 0)
         max_iterations = get_state_value(state, "max_discover_iterations", 5)
 
+        logger.debug(
+            "Discover iteration",
+            iteration=discover_iterations,
+            max_iterations=max_iterations,
+            complete=discovery_complete,
+        )
         print(f"  [Discover] 迭代 {discover_iterations}/{max_iterations}, 完成={discovery_complete}")
 
         if discovery_complete or discover_iterations >= max_iterations:

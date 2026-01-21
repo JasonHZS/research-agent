@@ -164,10 +164,10 @@ The backend uses FastAPI and provides RESTful API and streaming support.
 
 ```bash
 # Start with uvicorn (development mode with hot reload)
-uv run uvicorn src.api.main:app --reload --port 8000
+ENV=development uv run uvicorn src.api.main:app --reload --port 8000
 
 # Or use Python module approach
-uv run python -m src.api.main
+ENV=development uv run python -m src.api.main
 
 # Use LangGraph CLI (recommended, supports LangGraph Studio)
 langgraph dev
@@ -186,7 +186,8 @@ For production environments, it is recommended to use `uv run` to ensure environ
 
 ```bash
 # Start with uvicorn (production mode)
-uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+ENV=production LOG_FILE=/var/log/research-agent/app.log \
+  uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000
 ```
 
 

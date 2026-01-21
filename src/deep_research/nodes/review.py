@@ -11,6 +11,9 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
 from src.prompts import load_prompt
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from ..state import AgentState, DeepResearchConfig, Section
 from ..structured_outputs import ReviewResult
@@ -89,11 +92,19 @@ async def review_node(
         llm_with_output = llm.with_structured_output(ReviewResult)
         result: ReviewResult = await llm_with_output.ainvoke(prompt_text)
 
+        logger.info(
+            "Review completed",
+            score=result.overall_score,
+            is_sufficient=result.is_sufficient,
+            iteration=review_iterations + 1,
+            max_iterations=max_review_iterations,
+        )
         print(f"\n[Review]: 评分={result.overall_score}/10, 充足={result.is_sufficient}")
         print(f"  迭代: {review_iterations + 1}/{max_review_iterations}")
 
         # 如果信息充足或达到最大迭代，进入报告生成
         if result.is_sufficient or (review_iterations + 1) >= max_review_iterations:
+            logger.info("Review decision: proceed to final report")
             print("  -> 进入最终报告生成\n")
             return Command(
                 goto="final_report",
@@ -118,6 +129,10 @@ async def review_node(
             else:
                 updated_sections.append(s)
 
+        logger.info(
+            "Review decision: retry sections",
+            sections_to_retry=list(sections_to_retry),
+        )
         print(f"  需要重新研究: {list(sections_to_retry)}")
         print("  -> 返回 plan_sections 重新派发\n")
 
@@ -131,6 +146,11 @@ async def review_node(
 
     except Exception as e:
         # 出错时直接继续到报告生成
+        logger.warning(
+            "Review evaluation error, proceeding to final report",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
         print(f"\n[Review]: 评估出错: {e}，直接生成报告\n")
         return Command(
             goto="final_report",

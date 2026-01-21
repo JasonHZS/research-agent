@@ -17,42 +17,50 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.middleware import LoggingMiddleware
 from src.api.routes import chat_router, models_router
 from src.api.services.agent_service import get_agent_service
 from src.main import initialize_mcp_tools
+from src.utils.logging_config import configure_logging, get_logger
 
 # Load environment variables
 load_dotenv()
+
+# Initialize logging (must be called before creating loggers)
+configure_logging()
+
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events."""
     # Startup
-    print("Starting Research Agent API (ephemeral session mode)...")
+    logger.info("Starting Research Agent API", mode="ephemeral")
 
     # Initialize MCP tools (Hacker News)
     mcp_ctx = None
     try:
-        print("Loading MCP tools (Hacker News)...")
+        logger.info("Loading MCP tools", server="hacker_news")
         mcp_ctx = await initialize_mcp_tools()
         hn_count = len(mcp_ctx.hn_tools) if mcp_ctx and mcp_ctx.hn_tools else 0
         get_agent_service().set_mcp_tools(mcp_ctx.hn_tools if mcp_ctx else [])
-        print(f"Loaded Hacker News MCP tools: {hn_count}")
+        logger.info("MCP tools loaded", server="hacker_news", tool_count=hn_count)
     except Exception as e:
-        print(f"Warning: Failed to load MCP tools: {e}")
+        logger.warning("Failed to load MCP tools", error=str(e), exc_info=True)
 
-    print("API ready. Sessions are ephemeral (not persisted to database).")
+    logger.info("API ready", persistence="ephemeral")
 
     yield
 
     # Shutdown
-    print("Shutting down...")
+    logger.info("Shutting down API")
     if mcp_ctx:
         try:
             await mcp_ctx.cleanup()
+            logger.debug("MCP cleanup completed")
         except Exception as e:
-            print(f"Warning: MCP cleanup failed: {e}")
+            logger.warning("MCP cleanup failed", error=str(e))
 
 
 # Create FastAPI app
@@ -62,6 +70,9 @@ app = FastAPI(
     version="0.2.0",
     lifespan=lifespan,
 )
+
+# Add logging middleware (must be added before other middleware for accurate timing)
+app.add_middleware(LoggingMiddleware)
 
 # Configure CORS for frontend
 app.add_middleware(

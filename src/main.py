@@ -42,7 +42,12 @@ from src.config.deep_research_config import (
 )
 from src.config.llm_config import get_model_settings
 from src.config.mcp_config import get_single_server_config
+from src.utils.logging_config import configure_logging, get_logger
 from src.utils.stream_display import StreamDisplay
+
+# Initialize logging for CLI mode (colored console output)
+configure_logging()
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -83,13 +88,10 @@ async def _load_mcp_server_tools(
         client = MultiServerMCPClient({server_name: config})
         # In langchain-mcp-adapters 0.1.0+, get_tools() handles connection internally
         tools = await client.get_tools()
-        # print(f"✓ Loaded {len(tools)} tools from {server_name} MCP server")
-        # for tool in tools:
-        #     desc = tool.description[:50] if tool.description else "No description"
-        #     print(f"  - {tool.name}: {desc}...")
+        logger.debug("MCP tools loaded", server=server_name, tool_count=len(tools))
         return client, tools
     except Exception as e:
-        print(f"⚠ Warning: Could not load {server_name} MCP tools: {e}")
+        logger.warning("Could not load MCP tools", server=server_name, error=str(e))
         return None, []
 
 
@@ -107,7 +109,7 @@ async def initialize_mcp_tools() -> MCPToolsContext:
 
     total_tools = len(ctx.hn_tools)
     if total_tools == 0:
-        print("  Continuing with built-in tools only...")
+        logger.info("No MCP tools loaded, continuing with built-in tools only")
 
     return ctx
 
@@ -240,10 +242,8 @@ async def main_deep_research(
             print("\n⚠ No report generated. Please try again with a different query.")
 
     except Exception as e:
+        logger.exception("Deep research failed", error=str(e))
         print(f"\n❌ Error during research: {e}")
-        if verbose:
-            import traceback
-            traceback.print_exc()
 
 
 async def main(
@@ -295,6 +295,7 @@ async def main(
             enable_thinking_override=enable_thinking,
         )
     except ValueError as e:
+        logger.error("Invalid model settings", error=str(e))
         print(f"Error: {e}")
         sys.exit(1)
     resolved_provider = model_settings["provider"]
@@ -304,18 +305,22 @@ async def main(
     # Check for required API keys based on provider
     if resolved_provider == "aliyun":
         if not (os.getenv("ALIYUN_API_KEY") or os.getenv("DASHSCOPE_API_KEY")):
+            logger.error("Missing API key", provider="aliyun")
             print("Error: ALIYUN_API_KEY or DASHSCOPE_API_KEY environment variable not set")
             print("Please set it in your .env file or environment")
             sys.exit(1)
     elif resolved_provider == "anthropic" and not os.getenv("ANTHROPIC_API_KEY"):
+        logger.error("Missing API key", provider="anthropic")
         print("Error: ANTHROPIC_API_KEY environment variable not set")
         print("Please set it in your .env file or environment")
         sys.exit(1)
     elif resolved_provider == "openai" and not os.getenv("OPENAI_API_KEY"):
+        logger.error("Missing API key", provider="openai")
         print("Error: OPENAI_API_KEY environment variable not set")
         print("Please set it in your .env file or environment")
         sys.exit(1)
     elif resolved_provider == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
+        logger.error("Missing API key", provider="openrouter")
         print("Error: OPENROUTER_API_KEY environment variable not set")
         print("Please set it in your .env file or environment")
         sys.exit(1)
@@ -333,6 +338,14 @@ async def main(
     deep_str = f" | Max Iter: {resolved_max_iterations} | Concurrent: {resolved_max_concurrent}" if deep_research else ""
     print(f"Provider: {resolved_provider} | Model: {resolved_model_name or 'default'}{thinking_str}{deep_str}")
     print("=" * 60)
+
+    logger.info(
+        "Starting research agent",
+        mode="deep_research" if deep_research else "standard",
+        provider=resolved_provider,
+        model=resolved_model_name,
+        thinking=resolved_enable_thinking,
+    )
 
     # Initialize MCP tools (per server)
     mcp_ctx = await initialize_mcp_tools()

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from collections.abc import AsyncGenerator
 from typing import Any, Optional
 
@@ -28,6 +29,9 @@ from src.api.schemas.chat import (
 )
 from src.config.deep_research_config import get_max_concurrent_researchers
 from src.config.llm_factory import ALIYUN_MODELS, OPENROUTER_MODELS
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class AgentService:
@@ -73,18 +77,28 @@ class AgentService:
         # Check if we can reuse existing agent
         # cached_config is now (provider, model, is_deep_research)
         if cached_agent and cached_config == (requested_provider, requested_model, is_deep_research):
-            print(f"Using existing agent for conversation {conversation_id}")
+            logger.debug(
+                "Reusing existing agent",
+                conversation_id=conversation_id,
+            )
             return cached_agent
 
         if cached_agent:
-            print(
-                f"Recreating agent for conversation {conversation_id} due to config change: "
-                f"{cached_config} -> {(requested_provider, requested_model, is_deep_research)}"
+            logger.info(
+                "Recreating agent due to config change",
+                conversation_id=conversation_id,
+                old_config=str(cached_config),
+                new_config=str((requested_provider, requested_model, is_deep_research)),
             )
 
         try:
             if is_deep_research:
-                print(f"Creating Deep Research agent for {conversation_id}")
+                logger.info(
+                    "Creating Deep Research agent",
+                    conversation_id=conversation_id,
+                    provider=requested_provider,
+                    model=requested_model,
+                )
                 agent = build_deep_research_graph(
                     hn_mcp_tools=self._hn_mcp_tools,
                     model_provider=requested_provider,
@@ -93,6 +107,12 @@ class AgentService:
                     store=store,
                 )
             else:
+                logger.info(
+                    "Creating Research agent",
+                    conversation_id=conversation_id,
+                    provider=requested_provider,
+                    model=requested_model,
+                )
                 agent = create_research_agent(
                     hn_mcp_tools=self._hn_mcp_tools,
                     model_provider=requested_provider,
@@ -102,14 +122,22 @@ class AgentService:
                     debug=False,
                 )
             
-            print(f"Agent ready for conversation {conversation_id} with provider={requested_provider}, model={requested_model}, deep_research={is_deep_research}")
+            logger.info(
+                "Agent ready",
+                conversation_id=conversation_id,
+                provider=requested_provider,
+                model=requested_model,
+                is_deep_research=is_deep_research,
+            )
             self._agents[conversation_id] = agent
             self._agent_configs[conversation_id] = (requested_provider, requested_model, is_deep_research)
             return agent
         except Exception as e:
-            print(f"ERROR creating agent: {e}")
-            import traceback
-            print(traceback.format_exc())
+            logger.exception(
+                "Failed to create agent",
+                conversation_id=conversation_id,
+                error=str(e),
+            )
             raise
 
     def remove_agent(self, conversation_id: str) -> None:
@@ -133,6 +161,26 @@ class AgentService:
             except TypeError:
                 text = str(content)
         return text[:max_len] if max_len and len(text) > max_len else text
+
+    @staticmethod
+    def _is_error_result(result: str) -> bool:
+        """Check if a tool result indicates an error."""
+        if not result:
+            return False
+        result_lower = result.lower()
+        # Common error indicators in tool results
+        error_indicators = [
+            "error",
+            "failed",
+            "exception",
+            "timeout",
+            "connection refused",
+            "not found",
+            "unauthorized",
+            "forbidden",
+            "rate limit",
+        ]
+        return any(indicator in result_lower for indicator in error_indicators)
 
     @staticmethod
     def _is_stream_disconnect_error(exc: Exception) -> bool:
@@ -237,13 +285,22 @@ class AgentService:
                             if tool_id:
                                 existing_tool_ids.add(tool_id)
             if existing_tool_ids:
-                print(f"Found {len(existing_tool_ids)} existing tool calls in checkpoint")
+                logger.debug(
+                    "Found existing tool calls in checkpoint",
+                    conversation_id=conversation_id,
+                    count=len(existing_tool_ids),
+                )
         except Exception as e:
             # Graceful fallback if state retrieval fails
-            print(f"Warning: Could not retrieve checkpoint state: {e}")
+            logger.warning(
+                "Could not retrieve checkpoint state",
+                conversation_id=conversation_id,
+                error=str(e),
+            )
 
         # Track tool calls for this response only
         active_tool_calls: dict[str, ToolCall] = {}
+        tool_call_start_times: dict[str, float] = {}  # Track start times for duration calc
         seen_tool_ids: set[str] = existing_tool_ids.copy()  # Start with existing IDs
         tool_call_counter = 0
         
@@ -253,7 +310,6 @@ class AgentService:
 
         extra_config = None
         max_concurrency = None
-        log_tool_calls = False
         completed_tool_ids: set[str] = set()
 
         try:
@@ -265,7 +321,6 @@ class AgentService:
                     "model_name": model_name,
                 }
                 max_concurrency = get_max_concurrent_researchers()
-            log_tool_calls = bool(extra_config and extra_config.get("verbose"))
             
             async for mode, chunk in run_research_stream(
                 query=message,
@@ -424,11 +479,16 @@ class AgentService:
                                         status=ToolCallStatus.RUNNING,
                                     )
                                     active_tool_calls[tool_id] = tool_call
+                                    tool_call_start_times[tool_id] = time.time()
 
-                                    if log_tool_calls:
-                                        print(
-                                            f"  [Tool Call] {tool_call.name}: {tool_call.args}"
-                                        )
+                                    # Always log tool calls for debugging and auditing
+                                    logger.info(
+                                        "Tool call started",
+                                        tool_id=tool_id,
+                                        tool_name=tool_call.name,
+                                        tool_args=tool_call.args,
+                                        conversation_id=conversation_id,
+                                    )
 
                                     yield StreamEvent(
                                         type=StreamEventType.TOOL_CALL_START,
@@ -444,14 +504,42 @@ class AgentService:
                                     and tool_id not in completed_tool_ids
                                 ):
                                     tool_call = active_tool_calls[tool_id]
-                                    tool_call.status = ToolCallStatus.COMPLETED
                                     tool_call.result = self._format_tool_result(
                                         getattr(msg, "content", None)
                                     )
+                                    
+                                    # Detect errors in tool result
+                                    is_error = self._is_error_result(tool_call.result)
+                                    tool_call.status = (
+                                        ToolCallStatus.FAILED if is_error 
+                                        else ToolCallStatus.COMPLETED
+                                    )
 
                                     completed_tool_ids.add(tool_id)
-                                    if log_tool_calls:
-                                        print(f"  [Tool Done] {tool_call.name} ✓")
+                                    # Calculate duration
+                                    start_time = tool_call_start_times.get(tool_id)
+                                    duration_ms = round((time.time() - start_time) * 1000, 2) if start_time else None
+                                    
+                                    # Log at different levels based on success/failure
+                                    result_preview = str(tool_call.result)[:200] if tool_call.result else None
+                                    if is_error:
+                                        logger.warning(
+                                            "Tool call failed",
+                                            tool_id=tool_id,
+                                            tool_name=tool_call.name,
+                                            duration_ms=duration_ms,
+                                            error_preview=result_preview,
+                                            conversation_id=conversation_id,
+                                        )
+                                    else:
+                                        logger.info(
+                                            "Tool call completed",
+                                            tool_id=tool_id,
+                                            tool_name=tool_call.name,
+                                            duration_ms=duration_ms,
+                                            result_preview=result_preview,
+                                            conversation_id=conversation_id,
+                                        )
 
                                     yield StreamEvent(
                                         type=StreamEventType.TOOL_CALL_END,
@@ -468,12 +556,10 @@ class AgentService:
             )
 
         except Exception as e:
-            import traceback
-
             if self._is_stream_disconnect_error(e):
-                print(
-                    "WARNING: Streaming connection closed early; "
-                    "retrying with non-streaming response."
+                logger.warning(
+                    "Streaming connection closed early, retrying with non-streaming",
+                    conversation_id=conversation_id,
                 )
                 
                 # Retry with exponential backoff for transient connection errors
@@ -484,7 +570,13 @@ class AgentService:
                     try:
                         if attempt > 0:
                             delay = base_delay * (2 ** (attempt - 1))  # 1s, 2s, 4s
-                            print(f"Retry attempt {attempt + 1}/{max_retries} after {delay}s delay...")
+                            logger.info(
+                                "Retry attempt",
+                                attempt=attempt + 1,
+                                max_retries=max_retries,
+                                delay_seconds=delay,
+                                conversation_id=conversation_id,
+                            )
                             await asyncio.sleep(delay)
                         
                         final_text = await run_research_async(
@@ -563,11 +655,15 @@ class AgentService:
                                                 status=ToolCallStatus.RUNNING,
                                             )
                                             active_tool_calls[tool_id] = tool_call
-                                            if log_tool_calls:
-                                                print(
-                                                    "  [Tool Call] "
-                                                    f"{tool_call.name}: {tool_call.args}"
-                                                )
+                                            tool_call_start_times[tool_id] = time.time()
+                                            # Always log tool calls (fallback path)
+                                            logger.info(
+                                                "Tool call started (fallback)",
+                                                tool_id=tool_id,
+                                                tool_name=tool_call.name,
+                                                tool_args=tool_call.args,
+                                                conversation_id=conversation_id,
+                                            )
                                             yield StreamEvent(
                                                 type=StreamEventType.TOOL_CALL_START,
                                                 data=tool_call.model_dump(),
@@ -581,21 +677,51 @@ class AgentService:
                                             and tool_id not in completed_tool_ids
                                         ):
                                             tool_call = active_tool_calls[tool_id]
-                                            tool_call.status = ToolCallStatus.COMPLETED
                                             tool_call.result = self._format_tool_result(
                                                 getattr(msg, "content", None)
                                             )
+                                            
+                                            # Detect errors in tool result
+                                            is_error = self._is_error_result(tool_call.result)
+                                            tool_call.status = (
+                                                ToolCallStatus.FAILED if is_error 
+                                                else ToolCallStatus.COMPLETED
+                                            )
+                                            
                                             completed_tool_ids.add(tool_id)
-                                            if log_tool_calls:
-                                                print(f"  [Tool Done] {tool_call.name} ✓")
+                                            # Calculate duration (may not be accurate in fallback path)
+                                            start_time = tool_call_start_times.get(tool_id)
+                                            duration_ms = round((time.time() - start_time) * 1000, 2) if start_time else None
+                                            
+                                            # Log at different levels based on success/failure (fallback path)
+                                            result_preview = str(tool_call.result)[:200] if tool_call.result else None
+                                            if is_error:
+                                                logger.warning(
+                                                    "Tool call failed (fallback)",
+                                                    tool_id=tool_id,
+                                                    tool_name=tool_call.name,
+                                                    duration_ms=duration_ms,
+                                                    error_preview=result_preview,
+                                                    conversation_id=conversation_id,
+                                                )
+                                            else:
+                                                logger.info(
+                                                    "Tool call completed (fallback)",
+                                                    tool_id=tool_id,
+                                                    tool_name=tool_call.name,
+                                                    duration_ms=duration_ms,
+                                                    result_preview=result_preview,
+                                                    conversation_id=conversation_id,
+                                                )
                                             yield StreamEvent(
                                                 type=StreamEventType.TOOL_CALL_END,
                                                 data=tool_call.model_dump(),
                                             )
                         except Exception as fallback_state_error:
-                            print(
-                                "Warning: Could not emit tool calls from fallback state: "
-                                f"{fallback_state_error}"
+                            logger.warning(
+                                "Could not emit tool calls from fallback state",
+                                conversation_id=conversation_id,
+                                error=str(fallback_state_error),
                             )
                         is_clarification = clarification_sent
                         if is_deep_research and not is_clarification:
@@ -620,9 +746,10 @@ class AgentService:
                                             "need_clarification", False
                                         )
                             except Exception as state_error:
-                                print(
-                                    "Warning: Could not read clarification status "
-                                    f"from state: {state_error}"
+                                logger.warning(
+                                    "Could not read clarification status from state",
+                                    conversation_id=conversation_id,
+                                    error=str(state_error),
                                 )
                         yield StreamEvent(
                             type=StreamEventType.MESSAGE_COMPLETE,
@@ -640,18 +767,29 @@ class AgentService:
                         is_retryable = self._is_stream_disconnect_error(fallback_error)
                         
                         if is_retryable and attempt < max_retries - 1:
-                            print(f"Retry {attempt + 1} failed with retryable error: {fallback_error}")
+                            logger.warning(
+                                "Retry failed with retryable error",
+                                attempt=attempt + 1,
+                                conversation_id=conversation_id,
+                                error=str(fallback_error),
+                            )
                             continue  # Try again
                         
                         # Final attempt failed or non-retryable error
-                        error_msg = (
-                            f"{str(fallback_error)}\n{traceback.format_exc()}"
+                        logger.error(
+                            "Non-streaming fallback failed",
+                            attempt=attempt + 1,
+                            conversation_id=conversation_id,
+                            error=str(fallback_error),
+                            exc_info=True,
                         )
-                        print(f"ERROR in non-streaming fallback (attempt {attempt + 1}): {error_msg}")
                         break  # Exit retry loop, fall through to error handling
 
-            error_msg = f"{str(e)}\n{traceback.format_exc()}"
-            print(f"ERROR in agent stream: {error_msg}")
+            logger.exception(
+                "Agent stream failed",
+                conversation_id=conversation_id,
+                error=str(e),
+            )
             yield StreamEvent(
                 type=StreamEventType.ERROR,
                 data={"message": str(e)},
