@@ -4,7 +4,7 @@ FastAPI Application Entry Point
 This module provides the FastAPI application for the research agent web API.
 
 Usage:
-    uvicorn src.api.main:app --reload --port 8000
+    uvicorn src.api.main:app --reload --port 8111
 
 Or with the CLI:
     python -m src.api.main
@@ -102,7 +102,7 @@ def main():
     """Run the API server."""
     import uvicorn
 
-    port = int(os.getenv("API_PORT", "8000"))
+    port = int(os.getenv("API_PORT", "8111"))
     host = os.getenv("API_HOST", "0.0.0.0")
 
     uvicorn.run(

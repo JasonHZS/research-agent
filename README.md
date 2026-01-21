@@ -164,7 +164,7 @@ The backend uses FastAPI and provides RESTful API and streaming support.
 
 ```bash
 # Start with uvicorn (development mode with hot reload)
-ENV=development uv run uvicorn src.api.main:app --reload --port 8000
+ENV=development uv run uvicorn src.api.main:app --reload --port 8111
 
 # Or use Python module approach
 ENV=development uv run python -m src.api.main
@@ -173,11 +173,11 @@ ENV=development uv run python -m src.api.main
 langgraph dev
 ```
 
-The API service runs on `http://localhost:8000` by default. You can configure it via environment variables:
+The API service runs on `http://localhost:8111` by default. You can configure it via environment variables:
 
 ```bash
 API_HOST=0.0.0.0  # Default 0.0.0.0
-API_PORT=8000     # Default 8000
+API_PORT=8111     # Default 8111
 ```
 
 ### Production Deployment
@@ -187,7 +187,7 @@ For production environments, it is recommended to use `uv run` to ensure environ
 ```bash
 # Start with uvicorn (production mode)
 ENV=production LOG_FILE=/var/log/research-agent/app.log \
-  uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+  uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8111
 ```
 
 

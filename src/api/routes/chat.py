@@ -43,7 +43,7 @@ async def stream_chat(request: ChatStreamRequest) -> StreamingResponse:
     Events include: token, thinking, tool_call_start, tool_call_end, message_complete, error.
 
     Example usage with curl:
-        curl -X POST http://localhost:8000/api/chat/stream \
+        curl -X POST http://localhost:8111/api/chat/stream \
             -H "Content-Type: application/json" \
             -d '{"session_id": "test", "message": "Hello"}'
     """
