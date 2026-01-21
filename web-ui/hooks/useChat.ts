@@ -36,6 +36,8 @@ interface ChatState {
   
   // Research Mode
   isDeepResearch: boolean;
+  /** Whether the Deep Research toggle is still available (locked after first message if not enabled) */
+  canToggleDeepResearch: boolean;
 
   // Streaming state
   streamingMessage: StreamingMessage | null;
@@ -52,6 +54,8 @@ interface ChatState {
   loadModels: () => Promise<void>;
   setModel: (provider: string, name: string) => void;
   toggleDeepResearch: () => void;
+  /** Lock Deep Research toggle (hide the button) */
+  lockDeepResearch: () => void;
 
   // Message handling
   addUserMessage: (content: string) => void;
@@ -77,6 +81,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   currentModelProvider: 'aliyun',
   currentModelName: 'qwen-max',
   isDeepResearch: false,
+  canToggleDeepResearch: true,
   streamingMessage: null,
   isLoading: false,
   error: null,
@@ -119,6 +124,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       currentMessages: [],
       streamingMessage: null,
       error: null,
+      // Reset Deep Research state for new chat
+      isDeepResearch: false,
+      canToggleDeepResearch: true,
     });
   },
 
@@ -146,9 +154,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({ isDeepResearch: !state.isDeepResearch }));
   },
 
+  // Lock Deep Research toggle (hide the button permanently for this session)
+  lockDeepResearch: () => {
+    set({ canToggleDeepResearch: false });
+  },
+
   // Add user message to current conversation
   addUserMessage: (content: string) => {
-    const { currentMessages } = get();
+    const { currentMessages, isDeepResearch, canToggleDeepResearch } = get();
     const newMessage: ChatMessage = {
       id: generateId(),
       role: 'user',
@@ -156,7 +169,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       tool_calls: [],
       created_at: new Date().toISOString(),
     };
-    set({ currentMessages: [...currentMessages, newMessage] });
+    
+    // Lock Deep Research toggle if not enabled and still unlocked
+    const updates: Partial<ChatState> = {
+      currentMessages: [...currentMessages, newMessage],
+    };
+    if (!isDeepResearch && canToggleDeepResearch) {
+      updates.canToggleDeepResearch = false;
+    }
+    
+    set(updates);
   },
 
   // Start streaming a new assistant message

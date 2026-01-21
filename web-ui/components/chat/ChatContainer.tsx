@@ -33,6 +33,8 @@ export function ChatContainer() {
     newChat,
     isDeepResearch,
     toggleDeepResearch,
+    canToggleDeepResearch,
+    lockDeepResearch,
   } = useChatStore();
 
   const hasMessages = currentMessages.length > 0 || streamingMessage;
@@ -233,6 +235,8 @@ export function ChatContainer() {
               placeholder={isDeepResearch ? "Deep Research Mode enabled..." : "Explore cutting-edge AI research..."}
               isDeepResearch={isDeepResearch}
               onToggleDeepResearch={toggleDeepResearch}
+              canToggleDeepResearch={canToggleDeepResearch}
+              onLockDeepResearch={lockDeepResearch}
               showExamples={true}
             />
           </div>
@@ -248,6 +252,8 @@ export function ChatContainer() {
               placeholder={isDeepResearch ? "Deep Research Mode enabled..." : "Explore cutting-edge AI research..."}
               isDeepResearch={isDeepResearch}
               onToggleDeepResearch={toggleDeepResearch}
+              canToggleDeepResearch={canToggleDeepResearch}
+              onLockDeepResearch={lockDeepResearch}
               showExamples={false}
             />
           </>

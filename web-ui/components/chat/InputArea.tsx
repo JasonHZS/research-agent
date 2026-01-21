@@ -15,6 +15,10 @@ interface InputAreaProps {
   className?: string;
   isDeepResearch?: boolean;
   onToggleDeepResearch?: () => void;
+  /** Whether the Deep Research toggle is still available */
+  canToggleDeepResearch?: boolean;
+  /** Callback to lock (hide) the Deep Research toggle */
+  onLockDeepResearch?: () => void;
   showExamples?: boolean;
 }
 
@@ -27,6 +31,8 @@ export function InputArea({
   className,
   isDeepResearch = false,
   onToggleDeepResearch,
+  canToggleDeepResearch = true,
+  onLockDeepResearch,
   showExamples = false,
 }: InputAreaProps) {
   const [input, setInput] = useState('');
@@ -88,9 +94,9 @@ export function InputArea({
           />
 
           <div className="flex items-center justify-between">
-            {/* Deep Research Toggle */}
+            {/* Deep Research Toggle - only show if enabled or still available to toggle */}
             <div className="flex items-center">
-              {onToggleDeepResearch && (
+              {onToggleDeepResearch && (isDeepResearch || canToggleDeepResearch) && (
                 <Button
                   variant="ghost"
                   size="sm"
