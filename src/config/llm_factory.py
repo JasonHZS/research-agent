@@ -33,7 +33,12 @@ ALIYUN_MODELS = {
     "qwen-max": "qwen-max",
     "qwen3-max": "qwen3-max",
     "kimi-k2-thinking": "kimi-k2-thinking",
+    "kimi-k2.5": "kimi-k2.5",
     "deepseek-v3.2": "deepseek-v3.2",
+    "glm-4.7": "glm-4.7",
+    # MiniMax-M2.1 暂不支持：模型在处理 Function Calling 时返回非 JSON 格式的 arguments
+    # 错误: "The 'function.arguments' parameter of the code model must be in JSON format."
+    # "minimax-m2.1": "MiniMax-M2.1",
 }
 DEFAULT_ALIYUN_MODEL = "qwen-max"
 
@@ -58,7 +63,7 @@ def create_llm(
     Args:
         model_provider: LLM 提供商 (aliyun, openai, anthropic, openrouter)。
         model_name: 具体的模型名称，未提供时使用默认值。
-        enable_thinking: 是否启用思考模式（仅部分模型支持，如 qwen-max/kimi/DeepSeek via DashScope）。
+        enable_thinking: 是否启用思考模式（仅部分模型支持，如 qwen-max/kimi/DeepSeek/GLM via DashScope）。
 
     Returns:
         LLM 实例 (ChatOpenAI 或 ChatAnthropic)。

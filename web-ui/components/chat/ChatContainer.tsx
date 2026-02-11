@@ -149,9 +149,9 @@ export function ChatContainer() {
   }, []);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="flex flex-col h-full relative">
+      {/* Header - Floating on top */}
+      <header className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           <h1 className="font-semibold text-lg">Research Agent</h1>
           {/* Streaming status indicator */}

@@ -120,7 +120,7 @@ export function InputArea({
                 buttonSize="sm"
                 fullWidth={false}
                 align="end"
-                className="h-8 rounded-full px-3 text-xs"
+                className="h-8 rounded-full px-3 text-xs shrink-0"
               />
 
               {/* Action button */}

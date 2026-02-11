@@ -112,49 +112,55 @@ export const ModelSelector = memo(function ModelSelector({
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className="w-64">
-        {sortedProviders.map((provider, index) => (
-          <div key={provider}>
-            {index > 0 && <DropdownMenuSeparator />}
-            <DropdownMenuLabel className="capitalize">
-              {provider}
-            </DropdownMenuLabel>
-            {modelsByProvider[provider].map((model) => {
-              // Clean up display name in dropdown
-              let itemDisplayName = model.display_name;
-              if (model.provider === 'aliyun') {
-                itemDisplayName = itemDisplayName.replace(/^Aliyun\s+/i, '');
-              } else if (model.provider === 'openrouter') {
-                itemDisplayName = itemDisplayName.replace(/\s*\(OpenRouter\)$/i, '');
-              }
-
-              return (
-                <DropdownMenuItem
-                  key={`${model.provider}-${model.name}`}
-                  onClick={() => setModel(model.provider, model.name)}
-                >
-                  <Check
-                    className={cn(
-                      'h-4 w-4 mr-2',
-                      model.provider === currentModelProvider &&
-                        model.name === currentModelName
-                        ? 'opacity-100'
-                        : 'opacity-0'
-                    )}
-                  />
-                  <div className="flex flex-col">
-                    <span>{itemDisplayName}</span>
-                    {model.supports_thinking && (
-                      <span className="text-xs text-muted-foreground">
-                        Supports thinking
-                      </span>
-                    )}
-                  </div>
-                </DropdownMenuItem>
-              );
-            })}
+      <DropdownMenuContent align={align} className="w-[300px] max-h-[500px] overflow-y-auto">
+        {sortedProviders.length === 0 ? (
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            No models available
           </div>
-        ))}
+        ) : (
+          sortedProviders.map((provider, index) => (
+            <div key={provider}>
+              {index > 0 && <DropdownMenuSeparator />}
+              <DropdownMenuLabel className="capitalize">
+                {provider}
+              </DropdownMenuLabel>
+              {modelsByProvider[provider].map((model) => {
+                // Clean up display name in dropdown
+                let itemDisplayName = model.display_name;
+                if (model.provider === 'aliyun') {
+                  itemDisplayName = itemDisplayName.replace(/^Aliyun\s+/i, '');
+                } else if (model.provider === 'openrouter') {
+                  itemDisplayName = itemDisplayName.replace(/\s*\(OpenRouter\)$/i, '');
+                }
+
+                return (
+                  <DropdownMenuItem
+                    key={`${model.provider}-${model.name}`}
+                    onClick={() => setModel(model.provider, model.name)}
+                  >
+                    <Check
+                      className={cn(
+                        'h-4 w-4 mr-2',
+                        model.provider === currentModelProvider &&
+                          model.name === currentModelName
+                          ? 'opacity-100'
+                          : 'opacity-0'
+                      )}
+                    />
+                    <div className="flex flex-col">
+                      <span>{itemDisplayName}</span>
+                      {model.supports_thinking && (
+                        <span className="text-xs text-muted-foreground">
+                          Supports thinking
+                        </span>
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                );
+              })}
+            </div>
+          ))
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

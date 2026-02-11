@@ -853,7 +853,7 @@ class AgentService:
                     provider="aliyun",
                     name=name,
                     display_name=f"Aliyun {name}",
-                    supports_thinking=name in ["qwen-max", "qwen3-max", "kimi-k2-thinking", "deepseek-v3.2"],
+                    supports_thinking=name in ["qwen-max", "qwen3-max", "kimi-k2-thinking", "kimi-k2.5", "deepseek-v3.2", "glm-4.7"],
                 )
             )
 

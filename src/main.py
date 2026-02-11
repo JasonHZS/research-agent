@@ -487,7 +487,7 @@ def run_cli() -> None:
         "--model",
         type=str,
         default=None,
-        help="Model name to use (default: env MODEL_NAME or provider default; e.g., 'qwen-max', 'kimi-k2-thinking', 'deepseek-v3.2' for aliyun)",
+        help="Model name to use (default: env MODEL_NAME or provider default; e.g., 'qwen-max', 'kimi-k2-thinking', 'deepseek-v3.2', 'glm-4.7' for aliyun)",
     )
     parser.add_argument(
         "-v", "--verbose",

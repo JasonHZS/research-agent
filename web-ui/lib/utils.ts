@@ -53,9 +53,9 @@ export function generateId(): string {
 export function getApiBaseUrl(): string {
   if (typeof window === 'undefined') return '';
 
-  // Development: use backend port 8000, Production: same origin
+  // Development: use backend port 8111, Production: same origin
   return process.env.NODE_ENV === 'development'
-    ? 'http://localhost:8000'
+    ? 'http://localhost:8111'
     : window.location.origin;
 }
 
