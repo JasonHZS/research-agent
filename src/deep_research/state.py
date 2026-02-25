@@ -247,7 +247,7 @@ class DeepResearchConfig(BaseModel):
 
     # 模型设置 (运行时解析)
     model_provider: str = "aliyun"
-    model_name: Optional[str] = "qwen-max"
+    model_name: Optional[str] = "qwen3.5-plus"
     enable_thinking: bool = False
 
     # 调试/显示

@@ -44,12 +44,12 @@ async def main() -> None:
             "Missing API key: set ALIYUN_API_KEY/DASHSCOPE_API_KEY or OPENAI_API_KEY."
         )
 
-    graph = build_deep_research_graph(model_provider="aliyun", model_name="qwen-max")
+    graph = build_deep_research_graph(model_provider="aliyun", model_name="qwen3.5-plus")
     config = {
         "configurable": {
             "thread_id": f"debug_full_{uuid.uuid4().hex[:8]}",
             "model_provider": "aliyun",
-            "model_name": "qwen-max",
+            "model_name": "qwen3.5-plus",
             "allow_clarification": True,
             "max_review_iterations": 2,
             "max_tool_calls_per_researcher": 10,

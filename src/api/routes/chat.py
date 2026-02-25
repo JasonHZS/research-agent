@@ -24,7 +24,7 @@ class ChatStreamRequest(BaseModel):
     session_id: str
     message: str
     model_provider: str = "aliyun"
-    model_name: str = "qwen-max"
+    model_name: str = "qwen3.5-plus"
     is_deep_research: bool = False
 
 

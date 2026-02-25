@@ -79,7 +79,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   currentMessages: [],
   models: [],
   currentModelProvider: 'aliyun',
-  currentModelName: 'qwen-max',
+  currentModelName: 'qwen3.5-plus',
   isDeepResearch: false,
   canToggleDeepResearch: true,
   streamingMessage: null,

@@ -41,3 +41,11 @@
 | Sequoia Capital Stories | https://sequoiacap.com/stories/?_story-category=perspective | 红杉资本行业洞察 |
 | SemiAnalysis | https://semianalysis.com/ | 半导体与 AI 基础设施深度分析 |
 
+### 广域技术博客（RSS Feeds）
+
+除上述权威信源外，你还可以通过 `list_rss_feeds_tool` 和 `fetch_rss_articles_tool` 访问约 90 个 Hacker News 热门技术博客的 RSS 订阅源。这些博客覆盖系统编程、安全、Web 开发、开源等广泛领域，适合用于：
+
+- 捕捉上述 Trusted Sources 未覆盖的技术趋势和社区讨论
+- 获取工程实践、系统设计等非 AI/ML 专项但相关的视角
+- 交叉验证：当多个独立博客同时讨论某一话题时，说明该话题值得关注
+

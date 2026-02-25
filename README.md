@@ -11,8 +11,8 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 - **Hacker News Integration**: Get trending stories and discussions via MCP
 - **Hugging Face Daily Papers**: Fetch daily featured AI/ML papers with titles and abstracts
 - **Hugging Face Blog**: Browse official and community blog posts with metadata
-- **Multi-LLM Support**: Works with Aliyun (qwen-max, kimi-k2-thinking), Anthropic Claude, and OpenAI GPT
-- **Thinking Mode**: Optional thinking mode for supported models (qwen-max, DeepSeek-v3.2, kimi-k2-thinking)
+- **Multi-LLM Support**: Works with Aliyun (qwen3.5-plus, qwen-max, kimi-k2-thinking), Anthropic Claude, and OpenAI GPT
+- **Thinking Mode**: Optional thinking mode for supported models (qwen3.5-plus, qwen-max, DeepSeek-v3.2, kimi-k2-thinking)
 - **Modular Architecture**: High cohesion, low coupling design for easy extension
 
 ## Two Research Modes
@@ -143,7 +143,7 @@ Edit `.env` and add your API keys:
 # Get your key from: https://dashscope.console.aliyun.com/
 ALIYUN_API_KEY=your-aliyun-dashscope-api-key
 
-# Available models: qwen-max (default), kimi-k2-thinking
+# Available models: qwen3.5-plus (default), qwen-max, kimi-k2-thinking
 
 # Or use alternative providers:
 # ANTHROPIC_API_KEY=your-anthropic-api-key
@@ -219,7 +219,7 @@ The frontend development server runs on `http://localhost:3000` by default.
 ### Interactive Mode
 
 ```bash
-# Run with default settings (Aliyun qwen-max)
+# Run with default settings (Aliyun qwen3.5-plus)
 uv run python -m src.main
 
 # Use kimi-k2-thinking model
@@ -300,7 +300,7 @@ async def main():
             query="Summarize today's Hugging Face papers on transformers",
             mcp_tools=tools,
             model_provider="aliyun",  # or "anthropic", "openai"
-            model_name="qwen-max",     # or "kimi-k2-thinking"
+            model_name="qwen3.5-plus", # or "qwen-max", "kimi-k2-thinking"
             enable_thinking=True,      # Enable thinking mode (optional)
         )
         print(result)
@@ -319,7 +319,7 @@ async def main():
     graph = build_deep_research_graph(
         hn_mcp_tools=None,  # Optional HN MCP tools
         model_provider="aliyun",
-        model_name="qwen-max",
+        model_name="qwen3.5-plus",
     )
 
     # Define clarification callback (optional)
@@ -333,7 +333,7 @@ async def main():
             "max_tool_calls_per_researcher": 10,
             "max_review_iterations": 2,
             "model_provider": "aliyun",
-            "model_name": "qwen-max",
+            "model_name": "qwen3.5-plus",
         }
     }
 

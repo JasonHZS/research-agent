@@ -33,7 +33,7 @@ def _get_config(config: RunnableConfig) -> DeepResearchConfig:
         ),
         max_review_iterations=configurable.get("max_review_iterations", 2),
         model_provider=configurable.get("model_provider", "aliyun"),
-        model_name=configurable.get("model_name", "qwen-max"),
+        model_name=configurable.get("model_name", "qwen3.5-plus"),
         enable_thinking=configurable.get("enable_thinking", False),
         allow_clarification=configurable.get("allow_clarification", True),
     )

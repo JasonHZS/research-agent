@@ -41,6 +41,7 @@ from src.tools.github_search import github_search_tool
 from src.tools.hf_blog import get_huggingface_blog_posts_tool
 from src.tools.hf_daily_papers import get_huggingface_papers_tool
 from src.tools.tavily_search import tavily_search_tool
+from src.tools.rss_feeds import fetch_rss_articles_tool, list_rss_feeds_tool
 from src.tools.zyte_reader import get_zyte_article_list_tool
 
 
@@ -60,7 +61,7 @@ def _get_model_config(
         model_provider: One of 'aliyun', 'anthropic', 'openai', or 'openrouter'.
         model_name: Specific model name.
         enable_thinking: Whether to enable thinking mode (only supported by some models
-                        like qwen-max, DeepSeek-v3.2, kimi-k2-thinking via DashScope).
+                        like qwen3.5-plus, qwen-max, DeepSeek-v3.2, kimi-k2-thinking via DashScope).
 
     Returns:
         Dictionary with model configuration for deepagents.
@@ -165,6 +166,8 @@ def create_research_agent(
         bocha_web_search_tool,  # General web search
         github_search_tool,  # Search GitHub repos, issues, commits (no auth)
         tavily_search_tool,  # Fallback search for finance/news/specialized domains
+        list_rss_feeds_tool,  # List available RSS feeds from curated blog collection
+        fetch_rss_articles_tool,  # Fetch recent articles from RSS feeds
     ]
 
     # Add discovery tools from HN MCP (getTopStories, getBestStories, etc.)

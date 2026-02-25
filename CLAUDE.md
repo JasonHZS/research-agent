@@ -21,7 +21,7 @@ uv pip install -e ".[dev]"
 
 ### Running the Agent
 ```bash
-# Interactive mode (default provider: Aliyun qwen-max)
+# Interactive mode (default provider: Aliyun qwen3.5-plus)
 python -m src.main
 
 # Single query mode
@@ -41,15 +41,14 @@ python -m src.main -v
 # Run all tests
 pytest
 
-# Run specific test file
-pytest tests/test_hf_daily_papers.py
+# Run unit tests only (no network required)
+pytest tests/test_rss_feeds.py
+
+# Run integration tests (require API keys / network)
+pytest tests/integration/
 
 # Run with verbose output
 pytest -v
-
-# Test content reader subagent independently
-python tests/test_content_reader.py --url "https://example.com"
-python tests/test_content_reader.py --arxiv-id "2401.12345" -v
 ```
 
 ### Code Quality
@@ -135,9 +134,10 @@ system_prompt = load_prompt("content_reader", summary_format=summary_format)
 The agent supports three providers (configured in `src/agent/research_agent.py`):
 
 1. **Aliyun (Default)**: Uses DashScope API with OpenAI-compatible endpoint
-   - Models: `qwen-max` (default), `kimi-k2-thinking`
+   - Models: `qwen3.5-plus` (default), `qwen-max`, `qwen3-max`, `kimi-k2-thinking`, `kimi-k2.5`, `deepseek-v3.2`, `glm-5`
    - Requires `ALIYUN_API_KEY` or `DASHSCOPE_API_KEY`
    - Custom base URL: `ALIYUN_API_BASE_URL` (optional)
+   - Note: `enable_thinking=True` only works with `aliyun` provider
 
 2. **Anthropic**: Native support
    - Default model: `claude-sonnet-4-20250514`
@@ -174,6 +174,13 @@ Built-in tools (non-MCP) should be added to:
 - `src/tools/` - Tool implementation as LangChain tool
 - Main agent: Import and add to `main_tools` list in `create_research_agent()`
 - Sub-agent: Import and add to `tools` list in `create_content_reader_subagent()`
+
+### RSS Feeds Tool
+
+`list_rss_feeds_tool` / `fetch_rss_articles_tool` - reads ~90 HN popular blogs via OPML.
+- OPML source: `src/config/hn-popular-blogs-2025.opml`
+- Feeds are cached in-memory per process; reset via `src.tools.rss_feeds._feeds_cache = {}`
+- `_MAX_ARTICLES = 100` global cap prevents context window overflow
 
 ### Adding New MCP Servers
 
@@ -239,16 +246,23 @@ src/
 │   └── subagents/
 │       └── content_reader_agent.py # Sub-agent for content reading
 ├── config/
-│   └── mcp_config.py               # MCP server configurations
+│   ├── mcp_config.py               # MCP server configurations
+│   ├── llm_factory.py              # LLM provider/model factory (create_llm())
+│   └── hn-popular-blogs-2025.opml  # ~90 HN popular blogs for RSS tool
 ├── prompts/
 │   ├── loader.py                   # Jinja2 template loader
 │   └── templates/                  # Markdown prompt templates
+│       └── trusted_sources.md      # Curated AI/ML sources list
 ├── tools/
 │   ├── hf_daily_papers.py          # Hugging Face daily papers tool
 │   ├── jina_reader.py              # Jina AI web reader tool
-│   └── arxiv_adapter.py            # ArXiv helpers
+│   ├── arxiv_adapter.py            # ArXiv helpers
+│   └── rss_feeds.py                # RSS feed reader (OPML-backed)
+├── deep_research/                  # Deep research graph (LangGraph)
 └── main.py                         # CLI entry point
 
-tests/                              # Test files for each tool
+tests/
+├── integration/                    # Integration tests (require API keys/network)
+└── test_rss_feeds.py               # Unit tests (mocked, no network)
 scripts/                            # Utility scripts
 ```

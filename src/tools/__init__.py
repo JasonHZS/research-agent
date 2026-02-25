@@ -36,6 +36,10 @@ from src.tools.github_search import (
     search_github_commits,
     get_github_readme,
 )
+from src.tools.rss_feeds import (
+    fetch_rss_articles_tool,
+    list_rss_feeds_tool,
+)
 from src.tools.tavily_search import (
     tavily_search_tool,
     search_tavily,
@@ -66,4 +70,6 @@ __all__ = [
     "get_github_readme",
     "tavily_search_tool",
     "search_tavily",
+    "list_rss_feeds_tool",
+    "fetch_rss_articles_tool",
 ]

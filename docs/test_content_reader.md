@@ -136,7 +136,7 @@ optional arguments:
   -p {aliyun,anthropic,openai}, --model-provider {aliyun,anthropic,openai}
                         LLM provider to use (default: aliyun)
   -m MODEL_NAME, --model-name MODEL_NAME
-                        Model name (e.g., 'qwen-max', 'kimi-k2-thinking')
+                        Model name (e.g., 'qwen3.5-plus', 'kimi-k2-thinking')
   --no-arxiv            Disable ArXiv MCP tools
   --enable-hn           Enable Hacker News MCP tools (disabled by default)
   -v, --verbose         Enable verbose mode (shows tool calls and agent steps)

@@ -8,16 +8,16 @@ and ArXiv papers using MCP tools.
 
 Usage:
     # Test reading a web page
-    uv run python tests/test_content_reader.py --url "https://lilianweng.github.io/posts/2023-06-23-agent/"
+    uv run python tests/integration/test_content_reader.py --url "https://lilianweng.github.io/posts/2023-06-23-agent/"
 
     # Test reading an ArXiv paper (requires ArXiv MCP)
-    uv run python tests/test_content_reader.py --arxiv-id "2402.02716"
+    uv run python tests/integration/test_content_reader.py --arxiv-id "2402.02716"
 
     # Test with custom query
-    uv run python tests/test_content_reader.py --query "Summarize the main ideas from https://example.com"
+    uv run python tests/integration/test_content_reader.py --query "Summarize the main ideas from https://example.com"
 
     # Use verbose mode to see tool calls
-    uv run python tests/test_content_reader.py --url "https://example.com" -v
+    uv run python tests/integration/test_content_reader.py --url "https://example.com" -v
 """
 
 import asyncio
@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 # Add project root to path
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
 from dotenv import load_dotenv
@@ -188,7 +188,7 @@ def main():
         "-m", "--model-name",
         type=str,
         default=None,
-        help="Model name (e.g., 'qwen-max', 'kimi-k2-thinking')",
+        help="Model name (e.g., 'qwen3.5-plus', 'kimi-k2-thinking')",
     )
 
     # MCP tools

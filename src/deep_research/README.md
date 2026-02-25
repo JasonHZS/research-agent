@@ -460,7 +460,7 @@ from src.deep_research import build_deep_research_graph, run_deep_research
 graph = build_deep_research_graph(
     hn_mcp_tools=None,  # 可选的 HN MCP 工具
     model_provider="aliyun",
-    model_name="qwen-max",
+    model_name="qwen3.5-plus",
 )
 
 # 定义澄清回调（可选）
@@ -474,7 +474,7 @@ config = {
         "max_tool_calls_per_researcher": 10,
         "max_review_iterations": 2,
         "model_provider": "aliyun",
-        "model_name": "qwen-max",
+        "model_name": "qwen3.5-plus",
     }
 }
 

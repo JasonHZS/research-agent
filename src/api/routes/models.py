@@ -17,5 +17,5 @@ async def list_models():
     return ModelsResponse(
         models=models,
         current_provider="aliyun",
-        current_model="qwen-max",
+        current_model="qwen3.5-plus",
     )

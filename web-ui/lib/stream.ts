@@ -60,7 +60,7 @@ function handleStreamEvent(event: StreamEvent, config: StreamConfig): void {
  * @param sessionId - The session/conversation ID
  * @param message - The user message to send
  * @param modelProvider - The model provider (e.g., 'aliyun')
- * @param modelName - The model name (e.g., 'qwen-max')
+ * @param modelName - The model name (e.g., 'qwen3.5-plus')
  * @param config - Event handlers for stream events
  * @param signal - Optional AbortSignal for cancellation
  */
