@@ -304,3 +304,92 @@ def fetch_rss_articles_tool(
         parts.append(f"\n_Note: {len(failed)} feed(s) failed to load: {', '.join(failed)}_")
 
     return "\n".join(parts)
+
+
+@tool
+def get_feeds_latest_overview_tool(category: Optional[str] = None) -> str:
+    """Get the newest article title and publish date from every RSS feed source.
+
+    This is a lightweight overview tool — it returns ONE line per feed with only
+    the latest article's title and date, so the agent can quickly scan what's new
+    across all ~90 sources without wasting tokens on full content.
+
+    Use this FIRST to discover recent activity, then call fetch_rss_articles_tool
+    on specific feeds that look interesting.
+
+    Args:
+        category: Optional category to filter feeds. If not provided, scans all feeds.
+
+    Returns:
+        Compact table: one line per feed with feed name, latest article title, and date.
+    """
+    try:
+        all_feeds = _parse_opml()
+    except FileNotFoundError as e:
+        return f"Error: {e}"
+
+    if not all_feeds:
+        return "No feeds found in the OPML file."
+
+    targets = all_feeds
+    if category:
+        cat_lower = category.lower()
+        targets = [f for f in all_feeds if cat_lower in f.category.lower()]
+        if not targets:
+            all_cats = sorted({f.category for f in all_feeds})
+            return (
+                f"No feeds found in category '{category}'. "
+                f"Available categories: {', '.join(all_cats)}"
+            )
+
+    # Fetch 1 article per feed in parallel
+    results: list[tuple[str, FeedArticle | None]] = []
+    failed: list[str] = []
+
+    executor = ThreadPoolExecutor(max_workers=10)
+    future_to_feed: dict[Future[list[FeedArticle]], FeedInfo] = {}
+    try:
+        future_to_feed = {executor.submit(_fetch_single_feed, f, 1): f for f in targets}
+        try:
+            for future in as_completed(future_to_feed, timeout=45):
+                feed = future_to_feed[future]
+                try:
+                    articles = future.result(timeout=15)
+                    latest = articles[0] if articles else None
+                    results.append((feed.name, latest))
+                except Exception:
+                    failed.append(feed.name)
+        except FuturesTimeoutError:
+            pending = [f.name for fut, f in future_to_feed.items() if not fut.done()]
+            failed.extend(pending)
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+    # Sort: feeds with dated articles first (newest on top), then undated, then empty
+    def _sort_key(item: tuple[str, FeedArticle | None]) -> tuple[int, str]:
+        _, article = item
+        if article is None:
+            return (2, "")
+        return (0 if article.published else 1, article.published or "")
+
+    results.sort(key=_sort_key, reverse=True)
+
+    # Format compact output
+    parts = [f"## Latest from {len(results)} feed(s)\n"]
+    parts.append("| # | Feed | Latest Article | Date |")
+    parts.append("|---|------|---------------|------|")
+
+    for i, (feed_name, article) in enumerate(results, 1):
+        if article:
+            date = article.published or "N/A"
+            title = article.title
+            if len(title) > 80:
+                title = title[:77] + "..."
+            parts.append(f"| {i} | {feed_name} | {title} | {date} |")
+        else:
+            parts.append(f"| {i} | {feed_name} | _(no articles)_ | — |")
+
+    if failed:
+        parts.append(f"\n_{len(failed)} feed(s) failed: {', '.join(failed)}_")
+
+    return "\n".join(parts)

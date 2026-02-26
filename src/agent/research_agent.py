@@ -41,7 +41,7 @@ from src.tools.github_search import github_search_tool
 from src.tools.hf_blog import get_huggingface_blog_posts_tool
 from src.tools.hf_daily_papers import get_huggingface_papers_tool
 from src.tools.tavily_search import tavily_search_tool
-from src.tools.rss_feeds import fetch_rss_articles_tool, list_rss_feeds_tool
+from src.tools.rss_feeds import fetch_rss_articles_tool, get_feeds_latest_overview_tool, list_rss_feeds_tool
 from src.tools.zyte_reader import get_zyte_article_list_tool
 
 
@@ -168,6 +168,7 @@ def create_research_agent(
         tavily_search_tool,  # Fallback search for finance/news/specialized domains
         list_rss_feeds_tool,  # List available RSS feeds from curated blog collection
         fetch_rss_articles_tool,  # Fetch recent articles from RSS feeds
+        get_feeds_latest_overview_tool,  # Quick scan: latest title+date from every feed
     ]
 
     # Add discovery tools from HN MCP (getTopStories, getBestStories, etc.)

@@ -38,6 +38,7 @@ from src.tools.github_search import (
 )
 from src.tools.rss_feeds import (
     fetch_rss_articles_tool,
+    get_feeds_latest_overview_tool,
     list_rss_feeds_tool,
 )
 from src.tools.tavily_search import (
@@ -72,4 +73,5 @@ __all__ = [
     "search_tavily",
     "list_rss_feeds_tool",
     "fetch_rss_articles_tool",
+    "get_feeds_latest_overview_tool",
 ]

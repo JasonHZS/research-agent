@@ -15,6 +15,7 @@ from src.tools.rss_feeds import (
     _parse_opml,
     _walk_outlines,
     fetch_rss_articles_tool,
+    get_feeds_latest_overview_tool,
     list_rss_feeds_tool,
 )
 
@@ -216,6 +217,62 @@ class TestFetchRssArticlesTool:
 
         assert _FakeExecutor.last_instance is not None
         assert _FakeExecutor.last_instance.shutdown_args == (False, True)
+
+
+class TestGetFeedsLatestOverviewTool:
+    """Tests for the get_feeds_latest_overview_tool."""
+
+    def test_returns_table_with_latest_articles(self, sample_opml_path):
+        mock_parsed = MagicMock()
+        mock_parsed.bozo = False
+        mock_parsed.entries = [
+            MagicMock(
+                title="Latest Post",
+                link="https://example.com/latest",
+                published_parsed=(2025, 6, 15, 10, 0, 0, 0, 0, 0),
+                **{"get.side_effect": lambda k, d="": {"title": "Latest Post", "link": "https://example.com/latest", "summary": "A summary"}.get(k, d)},
+            )
+        ]
+        # Ensure hasattr checks work
+        mock_parsed.entries[0].updated_parsed = None
+
+        with (
+            patch("src.tools.rss_feeds._OPML_PATH", sample_opml_path),
+            patch("src.tools.rss_feeds.feedparser.parse", return_value=mock_parsed),
+        ):
+            result = get_feeds_latest_overview_tool.invoke({})
+
+        assert "Latest from" in result
+        assert "Latest Post" in result
+        assert "2025-06-15" in result
+        # Should be a table format
+        assert "| #" in result
+
+    def test_shows_no_articles_for_empty_feeds(self, sample_opml_path):
+        mock_parsed = MagicMock()
+        mock_parsed.bozo = False
+        mock_parsed.entries = []
+
+        with (
+            patch("src.tools.rss_feeds._OPML_PATH", sample_opml_path),
+            patch("src.tools.rss_feeds.feedparser.parse", return_value=mock_parsed),
+        ):
+            result = get_feeds_latest_overview_tool.invoke({})
+
+        assert "_(no articles)_" in result
+
+    def test_category_filter(self, sample_opml_path):
+        mock_parsed = MagicMock()
+        mock_parsed.bozo = False
+        mock_parsed.entries = []
+
+        with (
+            patch("src.tools.rss_feeds._OPML_PATH", sample_opml_path),
+            patch("src.tools.rss_feeds.feedparser.parse", return_value=mock_parsed),
+        ):
+            result = get_feeds_latest_overview_tool.invoke({"category": "NonExistent"})
+
+        assert "No feeds found in category" in result
 
 
 class TestRealOpml:
