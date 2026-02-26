@@ -17,25 +17,11 @@ from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-from ..state import AgentState, DeepResearchConfig
+from ..config import parse_deep_research_config
+from ..state import AgentState
 from ..structured_outputs import QueryAnalysis
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
-
-
-def _get_config(config: RunnableConfig) -> DeepResearchConfig:
-    """从 RunnableConfig 中提取 DeepResearchConfig。"""
-    configurable = config.get("configurable", {})
-    return DeepResearchConfig(
-        max_tool_calls_per_researcher=configurable.get(
-            "max_tool_calls_per_researcher", 10
-        ),
-        max_review_iterations=configurable.get("max_review_iterations", 2),
-        model_provider=configurable.get("model_provider", "aliyun"),
-        model_name=configurable.get("model_name", "qwen3.5-plus"),
-        enable_thinking=configurable.get("enable_thinking", False),
-        allow_clarification=configurable.get("allow_clarification", True),
-    )
 
 
 async def analyze_query_node(
@@ -55,7 +41,7 @@ async def analyze_query_node(
     - list 类型且需要前置探索 -> discover (先整体发现)
     - 其他类型 -> plan_sections (直接规划)
     """
-    deep_config = _get_config(config)
+    deep_config = parse_deep_research_config(config)
 
     llm = get_llm(deep_config.model_provider, deep_config.model_name)
 

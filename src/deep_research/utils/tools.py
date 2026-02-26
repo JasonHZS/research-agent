@@ -6,7 +6,7 @@ Tool Assembly Utilities
 
 from typing import Optional
 
-from src.config.reader_config import ReaderType, get_reader_type
+from src.config.settings import ReaderType, resolve_reader_type
 
 
 def get_all_research_tools(hn_mcp_tools: Optional[list] = None) -> list:
@@ -48,7 +48,7 @@ def get_all_research_tools(hn_mcp_tools: Optional[list] = None) -> list:
     ]
 
     # 根据配置添加阅读工具
-    reader_type = get_reader_type()
+    reader_type = resolve_reader_type()
     if reader_type == ReaderType.ZYTE:
         from src.tools.zyte_reader import get_zyte_reader_tool
 

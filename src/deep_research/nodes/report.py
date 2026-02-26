@@ -9,24 +9,10 @@ from langchain_core.runnables import RunnableConfig
 
 from src.prompts import load_prompt
 
-from ..state import AgentState, DeepResearchConfig
+from ..config import parse_deep_research_config
+from ..state import AgentState
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
-
-
-def _get_config(config: RunnableConfig) -> DeepResearchConfig:
-    """从 RunnableConfig 中提取 DeepResearchConfig。"""
-    configurable = config.get("configurable", {})
-    return DeepResearchConfig(
-        max_tool_calls_per_researcher=configurable.get(
-            "max_tool_calls_per_researcher", 10
-        ),
-        max_review_iterations=configurable.get("max_review_iterations", 2),
-        model_provider=configurable.get("model_provider", "aliyun"),
-        model_name=configurable.get("model_name"),
-        enable_thinking=configurable.get("enable_thinking", False),
-        allow_clarification=configurable.get("allow_clarification", True),
-    )
 
 
 async def final_report_node(
@@ -38,7 +24,7 @@ async def final_report_node(
 
     基于 Section 的内容和来源，生成结构化的最终报告。
     """
-    deep_config = _get_config(config)
+    deep_config = parse_deep_research_config(config)
 
     llm = get_llm(deep_config.model_provider, deep_config.model_name)
 
@@ -77,7 +63,7 @@ async def final_report_node(
     )
 
     # token 限制的重试逻辑
-    max_retries = 3
+    max_retries = 10
     current_info = gathered_info
 
     for attempt in range(max_retries):

@@ -14,7 +14,7 @@ The reader tool is configured via CONTENT_READER_TYPE environment variable:
 
 from typing import Any
 
-from src.config.reader_config import ReaderType, get_reader_type
+from src.config.settings import ReaderType, resolve_reader_type
 from src.prompts import load_prompt
 from src.tools.github_search import github_readme_tool
 from src.tools.jina_reader import get_jina_reader_tool
@@ -75,7 +75,7 @@ def _get_reader_tool():
     Returns:
         The configured reader tool (Jina Reader or Zyte Reader).
     """
-    reader_type = get_reader_type()
+    reader_type = resolve_reader_type()
 
     if reader_type == ReaderType.ZYTE:
         return get_zyte_reader_tool

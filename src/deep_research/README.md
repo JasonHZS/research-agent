@@ -80,7 +80,7 @@ graph TB
 | `research_brief` | `str` | 研究简报（澄清后生成） |
 | `sections` | `list[Section]` | 章节列表（使用自定义 reducer） |
 | `review_iterations` | `int` | Review 迭代轮数 |
-| `max_review_iterations` | `int` | 最大 Review 迭代轮数 |
+| `max_iterations` | `int` | 最大 Review 迭代轮数（1-5） |
 | `final_report` | `str` | 最终研究报告 |
 
 #### Section 模型
@@ -378,7 +378,7 @@ START → researcher_invoke → tools → [循环或完成] → compress_output 
 
 **路由逻辑**：
 - `is_sufficient=true` → Final Report Node
-- `is_sufficient=false` 且未达 `max_review_iterations` → Dispatch（仅重新派发 pending 章节，**不重新生成大纲**）
+- `is_sufficient=false` 且未达 `max_iterations` → Dispatch（仅重新派发 pending 章节，**不重新生成大纲**）
 - 达到最大迭代次数 → 强制进入 Final Report Node
 
 > **设计说明**：Review 打回时不应重新生成研究大纲。大纲是根据用户意图设计的"研究方向"，Review 只是评估"研究执行的充分性"。重新生成大纲会丢失已完成章节的内容，因此 Review 只将特定章节标记为 `pending`，然后重新 dispatch。
@@ -405,8 +405,8 @@ START → researcher_invoke → tools → [循环或完成] → compress_output 
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `max_tool_calls_per_researcher` | `10` | 每个 researcher 的最大工具调用次数 |
-| `max_review_iterations` | `2` | Review 最大迭代轮数 |
+| `max_tool_calls` | `10` | 每个 researcher 的最大工具调用次数 |
+| `max_iterations` | `2` | Review 最大迭代轮数（1-5） |
 | `max_context_tokens` | `100000` | 上下文窗口阈值 |
 | `compression_target_tokens` | `8000` | 压缩后的目标 token 数 |
 | `allow_clarification` | `True` | 是否允许澄清 |
@@ -419,8 +419,8 @@ START → researcher_invoke → tools → [循环或完成] → compress_output 
 | 参数 | 说明 |
 |------|------|
 | `--deep-research` | 启用 Deep Research 模式 |
-| `--max-iterations N` | 设置最大 Review 迭代轮数 |
-| `-p, --provider` | 指定 LLM 提供商（aliyun/anthropic/openai） |
+| `--max-iterations N` | 设置最大 Review 迭代轮数（1-5） |
+| `-p, --model-provider` | 指定 LLM 提供商（aliyun/anthropic/openai/openrouter） |
 | `--model` | 指定具体模型名称 |
 | `-v, --verbose` | 启用详细日志 |
 
@@ -471,8 +471,9 @@ async def on_clarify(question: str) -> str:
 config = {
     "configurable": {
         "thread_id": "test-123",
-        "max_tool_calls_per_researcher": 10,
-        "max_review_iterations": 2,
+        # 推荐新键
+        "max_tool_calls": 10,
+        "max_iterations": 2,
         "model_provider": "aliyun",
         "model_name": "qwen3.5-plus",
     }
@@ -725,4 +726,3 @@ if result.get("needs_clarification"):
     current_state["messages"].append(HumanMessage(content=answer))
     current_state["needs_clarification"] = False
 ```
-

@@ -152,6 +152,17 @@ ALIYUN_API_KEY=your-aliyun-dashscope-api-key
 # Jina API Key (for web content reading)
 # Get your key from: https://jina.ai/
 JINA_API_KEY=your-jina-api-key
+
+# Optional model defaults (CLI / API request has higher priority)
+# MODEL_PROVIDER=aliyun
+# MODEL_NAME=qwen3.5-plus
+# ENABLE_THINKING=false
+
+# Optional Deep Research defaults
+# DEEP_RESEARCH_MAX_ITERATIONS=2
+# DEEP_RESEARCH_MAX_CONCURRENT=5
+# DEEP_RESEARCH_MAX_TOOL_CALLS=10
+# DEEP_RESEARCH_ALLOW_CLARIFICATION=true
 ```
 
 ## Web UI & API
@@ -268,6 +279,10 @@ uv run python -m src.main --deep-research -p anthropic -q "Transformer 的注意
 uv run python -m src.main --deep-research --model kimi-k2-thinking -q "LLM 推理优化技术"
 ```
 
+Deep Research 参数优先级：`CLI 参数 > 环境变量 > 默认值`。  
+默认值：`max_iterations=2`、`max_concurrent=5`、`max_tool_calls=10`。
+约束范围：`max_iterations=1-5`、`max_concurrent=1-10`、`max_tool_calls=1-20`。
+
 **Deep Research Flow:**
 1. **Clarify** - Asks clarifying questions if the query is ambiguous (can be skipped)
 2. **Analyze** - Identifies query type (list/comparison/deep_dive/general) and determines output format
@@ -330,8 +345,9 @@ async def main():
     config = {
         "configurable": {
             "thread_id": "research-session-1",
-            "max_tool_calls_per_researcher": 10,
-            "max_review_iterations": 2,
+            # Preferred keys (new naming)
+            "max_tool_calls": 10,
+            "max_iterations": 2,
             "model_provider": "aliyun",
             "model_name": "qwen3.5-plus",
         }
@@ -364,11 +380,11 @@ asyncio.run(main())
 
 ### Content Reader Configuration
 
-The Content Reader agent supports two reader tools. Configure in `src/config/reader_config.py`:
+The Content Reader agent supports two reader tools, configured via environment variable:
 
-```python
-# Options: ReaderType.JINA or ReaderType.ZYTE
-READER_TYPE: ReaderType = ReaderType.ZYTE
+```bash
+# Options: zyte or jina
+CONTENT_READER_TYPE=zyte
 ```
 
 | Reader | Description | Cost |

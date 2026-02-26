@@ -16,7 +16,8 @@ from langgraph.types import Command
 from src.prompts import load_prompt
 from src.utils.logging_config import get_logger
 
-from ..state import AgentState, DeepResearchConfig, DiscoveredItem
+from ..config import parse_deep_research_config
+from ..state import AgentState, DiscoveredItem
 from ..structured_outputs import DiscoveryResult, get_researcher_tools
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
@@ -41,21 +42,6 @@ class DiscoverState(AgentState):
     max_discover_iterations: int = 5  # 最多执行 5 轮搜索（避免递归限制）
 
 
-def _get_config(config: RunnableConfig) -> DeepResearchConfig:
-    """从 RunnableConfig 中提取 DeepResearchConfig。"""
-    configurable = config.get("configurable", {})
-    return DeepResearchConfig(
-        max_tool_calls_per_researcher=configurable.get(
-            "max_tool_calls_per_researcher", 10
-        ),
-        max_review_iterations=configurable.get("max_review_iterations", 2),
-        model_provider=configurable.get("model_provider", "aliyun"),
-        model_name=configurable.get("model_name"),
-        enable_thinking=configurable.get("enable_thinking", False),
-        allow_clarification=configurable.get("allow_clarification", True),
-    )
-
-
 # ==============================================================================
 # 前置探索节点
 # ==============================================================================
@@ -71,7 +57,7 @@ async def _discover_invoke_node(
 
     使用多种工具进行广度搜索，发现所有相关实体。
     """
-    deep_config = _get_config(config)
+    deep_config = parse_deep_research_config(config)
 
     llm = get_llm(deep_config.model_provider, deep_config.model_name)
 
@@ -168,7 +154,7 @@ async def _extract_and_output_node(
 
     使用 LLM 结构化输出提取发现的所有实体。
     """
-    deep_config = _get_config(config)
+    deep_config = parse_deep_research_config(config)
 
     llm = get_llm(deep_config.model_provider, deep_config.model_name)
 
@@ -351,4 +337,3 @@ async def run_discovery(
         goto="plan_sections",
         update=result,
     )
-

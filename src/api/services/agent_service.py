@@ -27,8 +27,8 @@ from src.api.schemas.chat import (
     ToolCall,
     ToolCallStatus,
 )
-from src.config.deep_research_config import get_max_concurrent_researchers
 from src.config.llm_factory import ALIYUN_MODELS, OPENROUTER_MODELS
+from src.config.settings import resolve_runtime_settings
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -52,13 +52,17 @@ class AgentService:
     def _get_or_create_agent(
         self,
         conversation_id: str,
-        model_provider: str = "aliyun",
+        model_provider: Optional[str] = None,
         model_name: Optional[str] = None,
         is_deep_research: bool = False,
     ) -> Any:
         """Get existing agent or create a new one for the conversation."""
-        requested_provider = model_provider or "aliyun"
-        requested_model = model_name
+        runtime_settings = resolve_runtime_settings(
+            provider_override=model_provider,
+            model_name_override=model_name,
+        )
+        requested_provider = runtime_settings.llm.provider
+        requested_model = runtime_settings.llm.model_name
         
         state_key = (conversation_id, is_deep_research)
         checkpointer = self._checkpointers.get(state_key)
@@ -296,7 +300,7 @@ class AgentService:
         self,
         conversation_id: str,
         message: str,
-        model_provider: str = "aliyun",
+        model_provider: Optional[str] = None,
         model_name: Optional[str] = None,
         is_deep_research: bool = False,
     ) -> AsyncGenerator[StreamEvent, None]:
@@ -306,10 +310,15 @@ class AgentService:
         Yields StreamEvent objects that can be serialized and sent to clients.
         Each request is independent - no cross-request state tracking needed.
         """
+        runtime_settings = resolve_runtime_settings(
+            provider_override=model_provider,
+            model_name_override=model_name,
+        )
+
         agent = self._get_or_create_agent(
             conversation_id, 
-            model_provider, 
-            model_name,
+            runtime_settings.llm.provider, 
+            runtime_settings.llm.model_name,
             is_deep_research=is_deep_research
         )
 
@@ -360,10 +369,12 @@ class AgentService:
             if is_deep_research:
                 extra_config = {
                     "verbose": True,
-                    "model_provider": model_provider,
-                    "model_name": model_name,
+                    "model_provider": runtime_settings.llm.provider,
+                    "model_name": runtime_settings.llm.model_name,
+                    "max_iterations": runtime_settings.deep_research.max_iterations,
+                    "max_tool_calls": runtime_settings.deep_research.max_tool_calls,
                 }
-                max_concurrency = get_max_concurrent_researchers()
+                max_concurrency = runtime_settings.deep_research.max_concurrent
             
             async for mode, chunk in run_research_stream(
                 query=message,
@@ -608,13 +619,13 @@ class AgentService:
                 )
                 
                 # Retry with exponential backoff for transient connection errors
-                max_retries = 3
+                max_retries = 5
                 base_delay = 1.0  # seconds
                 
                 for attempt in range(max_retries):
                     try:
                         if attempt > 0:
-                            delay = base_delay * (2 ** (attempt - 1))  # 1s, 2s, 4s
+                            delay = base_delay * (2 ** (attempt - 1))  # 1s, 2s, 4s, 8s
                             logger.info(
                                 "Retry attempt",
                                 attempt=attempt + 1,

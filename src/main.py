@@ -33,14 +33,8 @@ from src.agent.research_agent import (
     run_research_async,
     run_research_stream,
 )
+from src.config.settings import resolve_runtime_settings
 from src.deep_research import build_deep_research_graph, run_deep_research
-from src.config.deep_research_config import (
-    get_max_iterations,
-    get_max_concurrent_researchers,
-    get_max_tool_calls,
-    get_allow_clarification,
-)
-from src.config.llm_config import get_model_settings
 from src.config.mcp_config import get_single_server_config
 from src.utils.logging_config import configure_logging, get_logger
 from src.utils.stream_display import StreamDisplay
@@ -196,9 +190,8 @@ async def main_deep_research(
         "configurable": {
             "thread_id": f"deep_research_{uuid.uuid4().hex[:8]}",
             "max_concurrent_researchers": max_concurrent,
-            "max_researcher_iterations": max_iterations,
-            "max_review_iterations": max_iterations,  # review 节点使用此配置
-            "max_tool_calls_per_researcher": max_tool_calls,
+            "max_iterations": max_iterations,
+            "max_tool_calls": max_tool_calls,
             "allow_clarification": allow_clarification,
             "model_provider": model_provider,
             "model_name": model_name,
@@ -279,7 +272,7 @@ async def main(
                         Resolved from CLI > env ENABLE_THINKING > default (False).
         deep_research: If True, runs in Deep Research mode with supervisor-researcher
                       multi-agent architecture.
-        max_iterations: Maximum supervisor iterations for Deep Research mode (default: 3).
+        max_iterations: Maximum supervisor iterations for Deep Research mode (default: 2).
         max_concurrent: Maximum concurrent researchers (default: 5).
         max_tool_calls: Maximum tool calls per researcher (default: 10).
         skip_clarify: If True, skips user clarification step.
@@ -287,20 +280,24 @@ async def main(
     # Load environment variables
     load_dotenv()
 
-    # Resolve model settings with precedence CLI > env > defaults
+    # Resolve settings with precedence CLI/API overrides > env > defaults
     try:
-        model_settings = get_model_settings(
+        runtime_settings = resolve_runtime_settings(
             provider_override=model_provider,
             model_name_override=model_name,
             enable_thinking_override=enable_thinking,
+            max_iterations_override=max_iterations,
+            max_concurrent_override=max_concurrent,
+            max_tool_calls_override=max_tool_calls,
+            allow_clarification_override=False if skip_clarify else None,
         )
     except ValueError as e:
         logger.error("Invalid model settings", error=str(e))
         print(f"Error: {e}")
         sys.exit(1)
-    resolved_provider = model_settings["provider"]
-    resolved_model_name = model_settings["model_name"]
-    resolved_enable_thinking = model_settings["enable_thinking"]
+    resolved_provider = runtime_settings.llm.provider
+    resolved_model_name = runtime_settings.llm.model_name
+    resolved_enable_thinking = runtime_settings.llm.enable_thinking
 
     # Check for required API keys based on provider
     if resolved_provider == "aliyun":
@@ -325,11 +322,10 @@ async def main(
         print("Please set it in your .env file or environment")
         sys.exit(1)
 
-    # Resolve max iterations for deep research
-    resolved_max_iterations = get_max_iterations(max_iterations)
-    resolved_max_concurrent = get_max_concurrent_researchers(max_concurrent)
-    resolved_max_tool_calls = get_max_tool_calls(max_tool_calls)
-    resolved_allow_clarification = get_allow_clarification(not skip_clarify if skip_clarify else None)
+    resolved_max_iterations = runtime_settings.deep_research.max_iterations
+    resolved_max_concurrent = runtime_settings.deep_research.max_concurrent
+    resolved_max_tool_calls = runtime_settings.deep_research.max_tool_calls
+    resolved_allow_clarification = runtime_settings.deep_research.allow_clarification
 
     print("=" * 60)
     mode_str = "Deep Research Mode" if deep_research else "Research Agent"
@@ -508,7 +504,7 @@ def run_cli() -> None:
         "--max-iterations",
         type=int,
         default=None,
-        help="Maximum supervisor iterations for Deep Research mode (default: 3)",
+        help="Maximum supervisor iterations for Deep Research mode (range: 1-5, default: 2)",
     )
     parser.add_argument(
         "--max-concurrent",

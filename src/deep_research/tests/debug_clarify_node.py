@@ -46,8 +46,8 @@ async def main() -> None:
             "model_provider": "aliyun",
             "model_name": "qwen3.5-plus",
             "allow_clarification": True,
-            "max_review_iterations": 2,
-            "max_tool_calls_per_researcher": 10,
+            "max_iterations": 2,
+            "max_tool_calls": 10,
         }
     }
 

@@ -31,9 +31,8 @@ from src.agent.subagents import (
     create_content_reader_subagent,
     get_main_agent_tools,
 )
-from src.config.llm_config import get_model_settings
 from src.config.llm_factory import create_llm
-from src.config.reader_config import get_reader_type
+from src.config.settings import resolve_llm_settings, resolve_reader_type
 from src.prompts import load_prompt
 from src.tools.arxiv_api import get_arxiv_paper_tool, search_arxiv_papers_tool
 from src.tools.bocha_search import bocha_web_search_tool
@@ -115,7 +114,7 @@ def create_research_agent(
     Args:
         hn_mcp_tools: Hacker News MCP tools (will be split between main/sub agent).
         model_provider: LLM provider ('aliyun', 'anthropic', 'openai', or 'openrouter').
-                        Resolved via CLI/env/defaults using llm_config when not set.
+                        Resolved via CLI/env/defaults via centralized settings when not set.
         model_name: Specific model to use. Resolved via CLI/env/defaults when not set.
         system_prompt: Custom system prompt. If provided, overrides prompt_template.
         prompt_template: Name of the prompt template to use (without .md extension).
@@ -178,7 +177,7 @@ def create_research_agent(
 
     # Resolve model settings (CLI > env > defaults)
     try:
-        model_settings = get_model_settings(
+        model_settings = resolve_llm_settings(
             provider_override=model_provider,
             model_name_override=model_name,
             enable_thinking_override=enable_thinking,
@@ -186,9 +185,9 @@ def create_research_agent(
     except ValueError as e:
         raise ValueError(f"Invalid model configuration: {e}") from e
 
-    resolved_provider = model_settings["provider"]
-    resolved_model_name = model_settings["model_name"]
-    resolved_enable_thinking = model_settings["enable_thinking"]
+    resolved_provider = model_settings.provider
+    resolved_model_name = model_settings.model_name
+    resolved_enable_thinking = model_settings.enable_thinking
 
     # Get model configuration
     model_config = _get_model_config(
@@ -197,7 +196,7 @@ def create_research_agent(
 
     # Load the system prompt from template with reader type and current date
     if system_prompt is None:
-        reader_type = get_reader_type()
+        reader_type = resolve_reader_type()
         current_date = date.today().strftime("%Y-%m-%d")
         system_prompt = load_prompt(
             prompt_template,

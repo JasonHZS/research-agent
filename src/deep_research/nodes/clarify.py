@@ -23,29 +23,14 @@ from langgraph.types import Command
 
 from src.prompts import load_prompt
 
-from ..state import AgentState, ClarificationStatus, DeepResearchConfig
+from ..config import parse_deep_research_config
+from ..state import AgentState, ClarificationStatus
 from ..structured_outputs import ClarifyWithUser
 from ..utils.display import render_tool_calls
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
 
 logger = logging.getLogger(__name__)
-
-
-def _get_config(config: RunnableConfig) -> DeepResearchConfig:
-    """从 RunnableConfig 中提取 DeepResearchConfig。"""
-    configurable = config.get("configurable", {})
-    return DeepResearchConfig(
-        max_tool_calls_per_researcher=configurable.get(
-            "max_tool_calls_per_researcher", 10
-        ),
-        max_review_iterations=configurable.get("max_review_iterations", 2),
-        model_provider=configurable.get("model_provider", "aliyun"),
-        model_name=configurable.get("model_name"),
-        enable_thinking=configurable.get("enable_thinking", False),
-        allow_clarification=configurable.get("allow_clarification", True),
-        verbose=configurable.get("verbose", False),
-    )
 
 
 def _get_clarify_tools() -> list:
@@ -76,7 +61,7 @@ async def clarify_with_user_node(
         Command 对象，包含下一节点和状态更新
     """
     # 获取配置
-    deep_config = _get_config(config)
+    deep_config = parse_deep_research_config(config)
     messages = get_state_value(state, "messages", [])
 
     # 从 messages 中提取用户的完整意图作为 original_query

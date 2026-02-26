@@ -10,13 +10,13 @@ Or with the CLI:
     python -m src.api.main
 """
 
-import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.config.settings import resolve_api_settings
 from src.api.middleware import LoggingMiddleware
 from src.api.routes import chat_router, models_router
 from src.api.services.agent_service import get_agent_service
@@ -102,13 +102,12 @@ def main():
     """Run the API server."""
     import uvicorn
 
-    port = int(os.getenv("API_PORT", "8111"))
-    host = os.getenv("API_HOST", "0.0.0.0")
+    api_settings = resolve_api_settings()
 
     uvicorn.run(
         "src.api.main:app",
-        host=host,
-        port=port,
+        host=api_settings.host,
+        port=api_settings.port,
         reload=True,
         log_level="info",
     )

@@ -182,7 +182,7 @@ class AgentState(MessagesState):
 
     # Review 迭代控制
     review_iterations: int = 0
-    max_review_iterations: int = 2
+    max_iterations: int = 2
 
     # 最终输出
     final_report: str = ""
@@ -235,8 +235,8 @@ class DeepResearchConfig(BaseModel):
     """
 
     # 并发控制
-    max_tool_calls_per_researcher: int = Field(default=10, ge=1, le=20)
-    max_review_iterations: int = Field(default=2, ge=1, le=5)
+    max_tool_calls: int = Field(default=10, ge=1, le=20)
+    max_iterations: int = Field(default=2, ge=1, le=5)
 
     # Token 限制
     max_context_tokens: int = Field(default=100000)

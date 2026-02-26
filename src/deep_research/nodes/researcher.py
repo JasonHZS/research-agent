@@ -14,27 +14,12 @@ from langgraph.prebuilt import ToolNode
 
 from src.prompts import load_prompt
 
-from ..state import DeepResearchConfig, ResearcherOutputState, ResearcherState, Section
+from ..config import parse_deep_research_config
+from ..state import ResearcherOutputState, ResearcherState, Section
 from ..structured_outputs import SectionContent, get_researcher_tools
 from ..utils.display import render_tool_calls
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
-
-
-def _get_config(config: RunnableConfig) -> DeepResearchConfig:
-    """从 RunnableConfig 中提取 DeepResearchConfig。"""
-    configurable = config.get("configurable", {})
-    return DeepResearchConfig(
-        max_tool_calls_per_researcher=configurable.get(
-            "max_tool_calls_per_researcher", 10
-        ),
-        max_review_iterations=configurable.get("max_review_iterations", 2),
-        model_provider=configurable.get("model_provider", "aliyun"),
-        model_name=configurable.get("model_name"),
-        enable_thinking=configurable.get("enable_thinking", False),
-        allow_clarification=configurable.get("allow_clarification", True),
-        verbose=configurable.get("verbose", False),
-    )
 
 
 async def _researcher_invoke_node(
@@ -47,7 +32,7 @@ async def _researcher_invoke_node(
 
     拥有所有搜索/阅读工具以及完成工具。
     """
-    deep_config = _get_config(config)
+    deep_config = parse_deep_research_config(config)
 
     llm = get_llm(deep_config.model_provider, deep_config.model_name)
 
@@ -65,19 +50,18 @@ async def _researcher_invoke_node(
     section_title = section.title if section else ""
     section_description = section.description if section else ""
 
-    # 系统提示（首次调用时添加）
-    if not researcher_messages:
-        system_prompt = load_prompt(
-            "deep_research/researcher",
-            section_title=section_title,
-            section_description=section_description,
-            research_brief=research_brief,
-        )
-        messages.append(SystemMessage(content=system_prompt))
-        messages.append(
-            HumanMessage(content=f"请研究以下章节: {section_title}\n\n{section_description}")
-        )
-
+    # 始终添加系统提示和初始用户消息（阿里云 API 要求至少有一条 user 角色消息，
+    # 工具调用后循环回 researcher 时 researcher_messages 只有 AIMessage/ToolMessage，无 HumanMessage）
+    system_prompt = load_prompt(
+        "deep_research/researcher",
+        section_title=section_title,
+        section_description=section_description,
+        research_brief=research_brief,
+    )
+    messages.append(SystemMessage(content=system_prompt))
+    messages.append(
+        HumanMessage(content=f"请研究以下章节: {section_title}\n\n{section_description}")
+    )
     messages.extend(researcher_messages)
 
     # 调用 LLM
@@ -156,7 +140,7 @@ async def _compress_and_output_node(
     从工具响应和 AI 推理中提取关键发现，
     返回 status=completed 的 Section。
     """
-    deep_config = _get_config(config)
+    deep_config = parse_deep_research_config(config)
 
     llm = get_llm(deep_config.model_provider, deep_config.model_name)
 

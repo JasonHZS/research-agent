@@ -18,25 +18,11 @@ from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-from ..state import AgentState, DeepResearchConfig, DiscoveredItem, Section
+from ..config import parse_deep_research_config
+from ..state import AgentState, DiscoveredItem, Section
 from ..structured_outputs import ResearchBrief
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
-
-
-def _get_config(config: RunnableConfig) -> DeepResearchConfig:
-    """从 RunnableConfig 中提取 DeepResearchConfig。"""
-    configurable = config.get("configurable", {})
-    return DeepResearchConfig(
-        max_tool_calls_per_researcher=configurable.get(
-            "max_tool_calls_per_researcher", 10
-        ),
-        max_review_iterations=configurable.get("max_review_iterations", 2),
-        model_provider=configurable.get("model_provider", "aliyun"),
-        model_name=configurable.get("model_name", "qwen3.5-plus"),
-        enable_thinking=configurable.get("enable_thinking", False),
-        allow_clarification=configurable.get("allow_clarification", True),
-    )
 
 
 def _generate_sections_from_discovered_items(
@@ -138,8 +124,8 @@ async def plan_sections_node(
     返回：
     - Command(goto=[Send, ...], update={...})
     """
-    deep_config = _get_config(config)
-    max_tool_calls = deep_config.max_tool_calls_per_researcher
+    deep_config = parse_deep_research_config(config)
+    max_tool_calls = deep_config.max_tool_calls
 
     # 检查是否已有 sections（review 循环回来的情况）
     existing_sections = get_state_value(state, "sections", [])
@@ -222,7 +208,7 @@ async def plan_sections_node(
                 update={
                     "research_brief": brief_text,
                     "sections": sections,
-                    "max_review_iterations": deep_config.max_review_iterations,
+                    "max_iterations": deep_config.max_iterations,
                 },
             )
 
@@ -299,7 +285,7 @@ async def plan_sections_node(
         update={
             "research_brief": brief_text,
             "sections": sections,
-            "max_review_iterations": deep_config.max_review_iterations,
+            "max_iterations": deep_config.max_iterations,
             "query_type": query_type,
             "output_format": output_format,
         },
