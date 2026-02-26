@@ -376,8 +376,8 @@ def get_feeds_latest_overview_tool(category: Optional[str] = None) -> str:
 
     # Format compact output
     parts = [f"## Latest from {len(results)} feed(s)\n"]
-    parts.append("| # | Feed | Latest Article | Date |")
-    parts.append("|---|------|---------------|------|")
+    parts.append("| # | Feed | Latest Article | Date | URL |")
+    parts.append("|---|------|---------------|------|-----|")
 
     for i, (feed_name, article) in enumerate(results, 1):
         if article:
@@ -385,9 +385,10 @@ def get_feeds_latest_overview_tool(category: Optional[str] = None) -> str:
             title = article.title
             if len(title) > 80:
                 title = title[:77] + "..."
-            parts.append(f"| {i} | {feed_name} | {title} | {date} |")
+            url = article.url or "N/A"
+            parts.append(f"| {i} | {feed_name} | {title} | {date} | {url} |")
         else:
-            parts.append(f"| {i} | {feed_name} | _(no articles)_ | — |")
+            parts.append(f"| {i} | {feed_name} | _(no articles)_ | — | — |")
 
     if failed:
         parts.append(f"\n_{len(failed)} feed(s) failed: {', '.join(failed)}_")
