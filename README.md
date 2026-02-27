@@ -197,7 +197,11 @@ For production environments, it is recommended to use `uv run` to ensure environ
 
 ```bash
 # Start with uvicorn (production mode)
-ENV=production LOG_FILE=/var/log/research-agent/app.log \
+# Logs will be written to logs/app.log in the project root (auto-created if not exists)
+ENV=production uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8111
+
+# Custom log path (optional)
+ENV=production LOG_FILE=/path/to/your/app.log \
   uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8111
 ```
 

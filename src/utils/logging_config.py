@@ -82,7 +82,15 @@ def configure_logging(
         # Production: JSON output to file
         if log_file is None:
             log_file = os.getenv("LOG_FILE", "logs/app.log")
-        os.makedirs(os.path.dirname(log_file) or ".", exist_ok=True)
+        log_dir = os.path.dirname(log_file) or "."
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+        except PermissionError:
+            raise PermissionError(
+                f"无法创建日志目录 '{log_dir}'，当前用户没有写入权限。"
+                f"请使用有权限的路径，例如：LOG_FILE=logs/app.log，"
+                f"或先用 sudo 创建目录并赋予权限。"
+            )
         handler: logging.Handler = logging.handlers.RotatingFileHandler(
             log_file,
             maxBytes=10 * 1024 * 1024,  # 10MB
