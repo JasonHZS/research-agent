@@ -3,10 +3,11 @@
 import json
 from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from src.api.auth import get_current_user
 from src.api.schemas.chat import (
     StreamEvent,
     StreamEventType,
@@ -35,7 +36,10 @@ class ChatResetRequest(BaseModel):
 
 
 @router.post("/stream")
-async def stream_chat(request: ChatStreamRequest) -> StreamingResponse:
+async def stream_chat(
+    request: ChatStreamRequest,
+    user: dict = Depends(get_current_user),
+) -> StreamingResponse:
     """
     SSE streaming endpoint for chat using NDJSON format.
 
@@ -110,7 +114,10 @@ async def stream_chat(request: ChatStreamRequest) -> StreamingResponse:
 
 
 @router.post("/reset")
-async def reset_chat(request: ChatResetRequest) -> dict[str, str]:
+async def reset_chat(
+    request: ChatResetRequest,
+    user: dict = Depends(get_current_user),
+) -> dict[str, str]:
     """Reset a chat session and clear any cached state."""
     agent_service = get_agent_service()
     agent_service.remove_agent(request.session_id)

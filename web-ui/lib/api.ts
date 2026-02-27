@@ -16,15 +16,28 @@ export interface ModelsResponse {
 }
 
 /**
+ * Build headers with optional Bearer token
+ */
+function authHeaders(token?: string | null): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+/**
  * API client singleton
  */
 export const api = {
   /**
    * Get list of available models
    */
-  async getModels(): Promise<ModelsResponse> {
+  async getModels(token?: string | null): Promise<ModelsResponse> {
     const baseUrl = getApiBaseUrl();
-    const res = await fetch(`${baseUrl}/api/models`);
+    const res = await fetch(`${baseUrl}/api/models`, {
+      headers: authHeaders(token),
+    });
 
     if (!res.ok) {
       throw new Error(`Failed to fetch models: ${res.status} ${res.statusText}`);
@@ -34,7 +47,7 @@ export const api = {
   },
 
   /**
-   * Health check endpoint
+   * Health check endpoint (public, no auth needed)
    */
   async healthCheck(): Promise<{ status: string; service: string }> {
     const baseUrl = getApiBaseUrl();
@@ -50,11 +63,11 @@ export const api = {
   /**
    * Reset an existing chat session on the backend.
    */
-  async resetSession(sessionId: string): Promise<void> {
+  async resetSession(sessionId: string, token?: string | null): Promise<void> {
     const baseUrl = getApiBaseUrl();
     const res = await fetch(`${baseUrl}/api/chat/reset`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
       body: JSON.stringify({ session_id: sessionId }),
     });
 

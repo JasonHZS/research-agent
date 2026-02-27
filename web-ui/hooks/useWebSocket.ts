@@ -37,7 +37,8 @@ export function useStream(options: UseStreamOptions = {}) {
       message: string,
       modelProvider: string,
       modelName: string,
-      isDeepResearch: boolean
+      isDeepResearch: boolean,
+      token?: string | null
     ): Promise<void> => {
       // Cancel any existing stream
       abortControllerRef.current?.abort();
@@ -97,7 +98,8 @@ export function useStream(options: UseStreamOptions = {}) {
           modelName,
           isDeepResearch,
           config,
-          abortControllerRef.current.signal
+          abortControllerRef.current.signal,
+          token
         );
       } catch (e) {
         // Ignore abort errors (user cancelled)

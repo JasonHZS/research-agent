@@ -7,8 +7,9 @@ import time
 from collections import defaultdict, deque
 from threading import Lock
 
-from fastapi import APIRouter, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 
+from src.api.auth import get_current_user
 from src.api.schemas.feeds import FeedDigestResponse
 from src.api.services.feed_digest_service import get_feed_digest
 from src.config.settings import resolve_feed_digest_security_settings
@@ -51,18 +52,6 @@ def reset_force_refresh_rate_limiter() -> None:
     _force_refresh_limiter.reset()
 
 
-def _extract_bearer_token(authorization: str | None) -> str | None:
-    if not authorization:
-        return None
-
-    parts = authorization.strip().split(maxsplit=1)
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return None
-
-    token = parts[1].strip()
-    return token or None
-
-
 def _get_client_identifier(request: Request) -> str:
     forwarded_for = request.headers.get("x-forwarded-for")
     if forwarded_for:
@@ -78,7 +67,6 @@ def _get_client_identifier(request: Request) -> str:
 
 def _authorize_force_refresh(
     request: Request,
-    authorization: str | None,
     x_admin_token: str | None,
 ) -> None:
     security_settings = resolve_feed_digest_security_settings()
@@ -90,13 +78,13 @@ def _authorize_force_refresh(
             detail="force_refresh is disabled because FEEDS_ADMIN_TOKEN is not configured.",
         )
 
-    provided_token = (x_admin_token or "").strip() or _extract_bearer_token(authorization)
+    provided_token = (x_admin_token or "").strip()
     if not provided_token or not secrets.compare_digest(provided_token, expected_token):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
                 "Admin token required for force_refresh. "
-                "Use header X-Admin-Token or Authorization: Bearer <token>."
+                "Use header X-Admin-Token."
             ),
         )
 
@@ -120,15 +108,12 @@ def _authorize_force_refresh(
 async def feed_digest(
     request: Request,
     force_refresh: bool = Query(False, description="Bypass cache and re-fetch all feeds"),
-    authorization: str | None = Header(
-        default=None,
-        description="Optional bearer token for protected operations.",
-    ),
     x_admin_token: str | None = Header(
         default=None,
         alias="X-Admin-Token",
         description="Admin token required when force_refresh=true.",
     ),
+    user: dict = Depends(get_current_user),
 ) -> FeedDigestResponse:
     """Get a lightweight digest of the latest article from every RSS feed.
 
@@ -139,7 +124,6 @@ async def feed_digest(
     if force_refresh:
         _authorize_force_refresh(
             request=request,
-            authorization=authorization,
             x_admin_token=x_admin_token,
         )
 

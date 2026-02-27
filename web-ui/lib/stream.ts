@@ -71,13 +71,19 @@ export async function streamChat(
   modelName: string,
   isDeepResearch: boolean,
   config: StreamConfig,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  token?: string | null
 ): Promise<void> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${getApiBaseUrl()}/api/chat/stream`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({
       session_id: sessionId,
       message,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import { GripVertical } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/utils';
 import type { FeedDigestItem, FeedDigestResponse } from '@/lib/types';
@@ -84,6 +85,7 @@ function FeedCard({ item, lang }: { item: FeedDigestItem; lang: 'zh' | 'en' }) {
 }
 
 export function FeedTicker() {
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [items, setItems] = useState<FeedDigestItem[]>([]);
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -95,19 +97,41 @@ export function FeedTicker() {
   const hasDragged = useRef(false);
 
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
     let cancelled = false;
-    const baseUrl = getApiBaseUrl();
-    fetch(`${baseUrl}/api/feeds/digest`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      .then((data: FeedDigestResponse) => {
+
+    const loadDigest = async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+
+        const baseUrl = getApiBaseUrl();
+        const response = await fetch(`${baseUrl}/api/feeds/digest`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`${response.status} ${response.statusText}`);
+        }
+
+        const data = (await response.json()) as FeedDigestResponse;
         if (cancelled) return;
         setItems(data.items.filter((i) => i.latest_title));
-      })
-      .catch(() => {});
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Failed to load feed digest:', error);
+        }
+      }
+    };
+
+    void loadDigest();
+
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [getToken, isLoaded, isSignedIn]);
 
   // Auto-scroll loop via requestAnimationFrame
   useEffect(() => {

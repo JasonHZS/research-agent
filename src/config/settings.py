@@ -52,6 +52,15 @@ DEFAULT_FEEDS_FORCE_REFRESH_WINDOW_SECONDS = 60
 # Content reader env names and defaults
 ENV_CONTENT_READER_TYPE = "CONTENT_READER_TYPE"
 
+# Clerk authentication env names
+ENV_CLERK_SECRET_KEY = "CLERK_SECRET_KEY"
+ENV_CLERK_AUTHORIZED_PARTIES = "CLERK_AUTHORIZED_PARTIES"
+DEFAULT_CLERK_AUTHORIZED_PARTIES = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+]
+
 
 class ReaderType(str, Enum):
     """Available content reader tool types."""
@@ -100,6 +109,12 @@ class FeedDigestSecuritySettings:
 
 
 @dataclass(frozen=True)
+class ClerkSettings:
+    secret_key: Optional[str]
+    authorized_parties: list[str]
+
+
+@dataclass(frozen=True)
 class RuntimeSettings:
     llm: LLMSettings
     deep_research: DeepResearchSettings
@@ -113,6 +128,7 @@ class AppSettings:
     reader_type: ReaderType
     api: APISettings
     feed_digest_security: FeedDigestSecuritySettings
+    clerk: ClerkSettings
 
 
 def resolve_llm_settings(
@@ -245,6 +261,21 @@ def resolve_feed_digest_security_settings(
     )
 
 
+def resolve_clerk_settings(env: Mapping[str, str] = os.environ) -> ClerkSettings:
+    secret_key = env.get(ENV_CLERK_SECRET_KEY)
+    if secret_key is not None:
+        secret_key = secret_key.strip() or None
+
+    raw_parties = env.get(ENV_CLERK_AUTHORIZED_PARTIES, "")
+    if raw_parties.strip():
+        parsed_parties = [p.strip() for p in raw_parties.split(",") if p.strip()]
+        authorized_parties = parsed_parties or list(DEFAULT_CLERK_AUTHORIZED_PARTIES)
+    else:
+        authorized_parties = list(DEFAULT_CLERK_AUTHORIZED_PARTIES)
+
+    return ClerkSettings(secret_key=secret_key, authorized_parties=authorized_parties)
+
+
 def resolve_reader_type(env: Mapping[str, str] = os.environ) -> ReaderType:
     if value := env.get(ENV_CONTENT_READER_TYPE):
         try:
@@ -312,6 +343,7 @@ def get_app_settings(env: Mapping[str, str] = os.environ) -> AppSettings:
         reader_type=resolve_reader_type(env=env),
         api=resolve_api_settings(env=env),
         feed_digest_security=resolve_feed_digest_security_settings(env=env),
+        clerk=resolve_clerk_settings(env=env),
     )
 
 

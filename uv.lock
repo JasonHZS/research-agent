@@ -245,6 +245,22 @@ wheels = [
 ]
 
 [[package]]
+name = "clerk-backend-api"
+version = "5.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "httpcore" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pyjwt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/de/29/c0e96f6c3c93af9627c450e549b18baf719ac451c5b957eab51f2711dffb/clerk_backend_api-5.0.2.tar.gz", hash = "sha256:289eb90a5a40cab34260062ee1f01f899e574731fb065c57aa822aec70867c27", size = 233399, upload-time = "2026-02-19T16:05:27.221Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/a2/e94b15e8f4bd3e69f2e88f22b48b0327337ba71edf8e8c5a2a40458c72d8/clerk_backend_api-5.0.2-py3-none-any.whl", hash = "sha256:33e26c678841cdb7072a8de86e0ddbe75cbeb178075dbb6f690e47f6e8426e7e", size = 489103, upload-time = "2026-02-19T16:05:25.297Z" },
+]
+
+[[package]]
 name = "click"
 version = "8.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1640,6 +1656,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "beautifulsoup4" },
+    { name = "clerk-backend-api" },
     { name = "deepagents" },
     { name = "fastapi" },
     { name = "feedparser" },
@@ -1682,6 +1699,7 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.20.0" },
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
+    { name = "clerk-backend-api", specifier = ">=1.0.0" },
     { name = "deepagents", specifier = ">=0.1.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "feedparser", specifier = ">=6.0.0" },

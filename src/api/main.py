@@ -19,7 +19,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.middleware import LoggingMiddleware
 from src.api.routes import chat_router, feeds_router, models_router
 from src.api.services.agent_service import get_agent_service
-from src.config.settings import resolve_api_settings
+from src.config.settings import (
+    DEFAULT_CLERK_AUTHORIZED_PARTIES,
+    resolve_api_settings,
+    resolve_clerk_settings,
+)
 from src.main import initialize_mcp_tools
 from src.utils.logging_config import configure_logging, get_logger
 
@@ -75,13 +79,16 @@ app = FastAPI(
 app.add_middleware(LoggingMiddleware)
 
 # Configure CORS for frontend
+# Merge Clerk authorized parties with default dev origins
+_dev_origins = [
+    *DEFAULT_CLERK_AUTHORIZED_PARTIES,
+]
+_clerk_origins = resolve_clerk_settings().authorized_parties
+_all_origins = list(dict.fromkeys(_dev_origins + _clerk_origins))  # deduplicate, preserve order
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Next.js dev server
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",  # Vite dev server (if used)
-    ],
+    allow_origins=_all_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

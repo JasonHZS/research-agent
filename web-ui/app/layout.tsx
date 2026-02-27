@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 import 'highlight.js/styles/github-dark.css';
 
@@ -28,15 +29,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
-      <body className={inter.className}>
-        <div className="flex h-screen overflow-hidden bg-background">
-          {children}
-        </div>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        </head>
+        <body className={inter.className}>
+          <div className="flex h-screen overflow-hidden bg-background">
+            {children}
+          </div>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { Plus, Sun, Moon } from 'lucide-react';
+import { useAuth, UserButton } from '@clerk/nextjs';
 import { GithubIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { MessageList } from './MessageList';
@@ -12,6 +13,7 @@ import type { StreamEvent, ToolCall, ResearchBrief } from '@/lib/types';
 import { generateId } from '@/lib/utils';
 
 export function ChatContainer() {
+  const { getToken } = useAuth();
   const {
     sessionId,
     currentModelProvider,
@@ -96,8 +98,12 @@ export function ChatContainer() {
 
   // Load models on mount
   useEffect(() => {
-    loadModels();
-  }, [loadModels]);
+    const load = async () => {
+      const token = await getToken();
+      loadModels(token);
+    };
+    load();
+  }, [loadModels, getToken]);
 
   // Handle send message
   const handleSend = useCallback(
@@ -106,6 +112,9 @@ export function ChatContainer() {
         setError('No session ID');
         return;
       }
+
+      // Get fresh session token
+      const token = await getToken();
 
       // Append dropped feed card URL as context for the backend
       const finalMessage = droppedFeedCard?.latest_url
@@ -122,7 +131,7 @@ export function ChatContainer() {
       startStreaming(requestId);
 
       // Send message via SSE stream
-      await sendMessage(sessionId, finalMessage, currentModelProvider, currentModelName, isDeepResearch);
+      await sendMessage(sessionId, finalMessage, currentModelProvider, currentModelName, isDeepResearch, token);
     },
     [
       sessionId,
@@ -135,6 +144,7 @@ export function ChatContainer() {
       sendMessage,
       setError,
       clearDroppedFeedCard,
+      getToken,
     ]
   );
 
@@ -144,9 +154,10 @@ export function ChatContainer() {
     finishStreaming();
   }, [stopStream, finishStreaming]);
 
-  const handleNewChat = useCallback(() => {
-    newChat();
-  }, [newChat]);
+  const handleNewChat = useCallback(async () => {
+    const token = await getToken();
+    newChat(token);
+  }, [newChat, getToken]);
 
   const toggleTheme = useCallback(() => {
     const html = document.documentElement;
@@ -218,6 +229,7 @@ export function ChatContainer() {
               <GithubIcon className="h-5 w-5" />
             </a>
           </Button>
+          <UserButton afterSignOutUrl="/" />
         </div>
       </header>
 

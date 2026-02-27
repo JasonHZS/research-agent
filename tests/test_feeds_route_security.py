@@ -4,9 +4,10 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+from src.api.auth import get_current_user
 from src.api.routes.feeds import reset_force_refresh_rate_limiter, router
 from src.api.schemas.feeds import FeedDigestResponse
 
@@ -24,6 +25,19 @@ def _reset_rate_limiter(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture
 def client() -> TestClient:
     app = FastAPI()
+    app.dependency_overrides[get_current_user] = lambda: {"sub": "user_test"}
+    app.include_router(router, prefix="/api")
+    return TestClient(app)
+
+
+@pytest.fixture
+def unauthenticated_client() -> TestClient:
+    app = FastAPI()
+
+    async def _unauthenticated_user() -> dict:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    app.dependency_overrides[get_current_user] = _unauthenticated_user
     app.include_router(router, prefix="/api")
     return TestClient(app)
 
@@ -37,6 +51,15 @@ def _mock_digest() -> FeedDigestResponse:
         cached=True,
         ttl_seconds=10800,
     )
+
+
+def test_digest_requires_authenticated_user(unauthenticated_client: TestClient):
+    mocked_get_digest = AsyncMock(return_value=_mock_digest())
+    with patch("src.api.routes.feeds.get_feed_digest", new=mocked_get_digest):
+        response = unauthenticated_client.get("/api/feeds/digest")
+
+    assert response.status_code == 401
+    mocked_get_digest.assert_not_awaited()
 
 
 def test_digest_without_force_refresh_does_not_require_admin_token(client: TestClient):
@@ -87,7 +110,7 @@ def test_force_refresh_allowed_with_valid_admin_token(
     mocked_get_digest.assert_awaited_once_with(force_refresh=True)
 
 
-def test_force_refresh_allowed_with_bearer_token(
+def test_force_refresh_allowed_with_valid_admin_token_and_user_authorization_header(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -97,24 +120,24 @@ def test_force_refresh_allowed_with_bearer_token(
     with patch("src.api.routes.feeds.get_feed_digest", new=mocked_get_digest):
         response = client.get(
             "/api/feeds/digest?force_refresh=true",
-            headers={"Authorization": "Bearer top-secret"},
+            headers={
+                "Authorization": "Bearer user-session-token",
+                "X-Admin-Token": "top-secret",
+            },
         )
 
     assert response.status_code == 200
     mocked_get_digest.assert_awaited_once_with(force_refresh=True)
 
 
-def test_force_refresh_rejected_with_invalid_bearer_token(
+def test_force_refresh_rejected_with_missing_admin_token(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setenv("FEEDS_ADMIN_TOKEN", "top-secret")
 
     with patch("src.api.routes.feeds.get_feed_digest", new=AsyncMock(return_value=_mock_digest())):
-        response = client.get(
-            "/api/feeds/digest?force_refresh=true",
-            headers={"Authorization": "Bearer wrong-token"},
-        )
+        response = client.get("/api/feeds/digest?force_refresh=true")
 
     assert response.status_code == 403
     assert "Admin token required" in response.json()["detail"]

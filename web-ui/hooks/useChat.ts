@@ -52,11 +52,11 @@ interface ChatState {
   clearDroppedFeedCard: () => void;
 
   // Session actions
-  initSession: () => void;
-  newChat: () => void;
+  initSession: (token?: string | null) => void;
+  newChat: (token?: string | null) => void;
 
   // Model actions
-  loadModels: () => Promise<void>;
+  loadModels: (token?: string | null) => Promise<void>;
   setModel: (provider: string, name: string) => void;
   toggleDeepResearch: () => void;
   /** Lock Deep Research toggle (hide the button) */
@@ -93,7 +93,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   droppedFeedCard: null,
 
   // Initialize session on page load, clearing any stale backend state
-  initSession: () => {
+  initSession: (token?: string | null) => {
     const { sessionId: currentSessionId } = get();
     if (currentSessionId) {
       return;
@@ -101,7 +101,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const existingSessionId = getStoredSessionId();
     if (existingSessionId) {
-      void api.resetSession(existingSessionId).catch((error) => {
+      void api.resetSession(existingSessionId, token).catch((error) => {
         console.warn('Failed to reset session:', error);
       });
     }
@@ -116,10 +116,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Start a new chat (reset session)
-  newChat: () => {
+  newChat: (token?: string | null) => {
     const { sessionId } = get();
     if (sessionId) {
-      void api.resetSession(sessionId).catch((error) => {
+      void api.resetSession(sessionId, token).catch((error) => {
         console.warn('Failed to reset session:', error);
       });
     }
@@ -137,9 +137,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Load available models
-  loadModels: async () => {
+  loadModels: async (token?: string | null) => {
     try {
-      const response = await api.getModels();
+      const response = await api.getModels(token);
       set({
         models: response.models,
         currentModelProvider: response.current_provider,

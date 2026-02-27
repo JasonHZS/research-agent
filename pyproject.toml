@@ -28,6 +28,8 @@ dependencies = [
     "aiosqlite>=0.20.0",
     # Logging
     "structlog>=24.0.0",
+    # Authentication
+    "clerk-backend-api>=1.0.0",
 ]
 
 [project.optional-dependencies]
