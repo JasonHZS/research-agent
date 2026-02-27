@@ -1,29 +1,32 @@
 """Tests for RSS feeds tool."""
 
 import concurrent.futures
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.tools.rss_feeds import (
-    FeedArticle,
     FeedInfo,
     _fetch_single_feed,
     _match_feed,
     _parse_opml,
-    _walk_outlines,
     fetch_rss_articles_tool,
     get_feeds_latest_overview_tool,
     list_rss_feeds_tool,
 )
 
+
 # Reset cache before each test
 @pytest.fixture(autouse=True)
-def _reset_cache():
+def _reset_cache(monkeypatch: pytest.MonkeyPatch):
     import src.tools.rss_feeds as mod
+
     mod._feeds_cache = {}
+    mock_response = MagicMock()
+    mock_response.content = b"<rss></rss>"
+    mock_response.raise_for_status.return_value = None
+    monkeypatch.setattr(mod.requests, "get", MagicMock(return_value=mock_response))
     yield
     mod._feeds_cache = {}
 
@@ -131,6 +134,7 @@ class TestFetchSingleFeed:
         assert len(articles) == 1
         assert articles[0].title == "Test Article"
         assert articles[0].feed_name == "test"
+        assert articles[0].published == "2025-01-15T10:00:00Z"
 
     def test_handles_parse_error(self):
         feed = FeedInfo("bad", "https://bad.example.com/feed", "")
@@ -223,6 +227,11 @@ class TestGetFeedsLatestOverviewTool:
     """Tests for the get_feeds_latest_overview_tool."""
 
     def test_returns_table_with_latest_articles(self, sample_opml_path):
+        entry_data = {
+            "title": "Latest Post",
+            "link": "https://example.com/latest",
+            "summary": "A summary",
+        }
         mock_parsed = MagicMock()
         mock_parsed.bozo = False
         mock_parsed.entries = [
@@ -230,7 +239,7 @@ class TestGetFeedsLatestOverviewTool:
                 title="Latest Post",
                 link="https://example.com/latest",
                 published_parsed=(2025, 6, 15, 10, 0, 0, 0, 0, 0),
-                **{"get.side_effect": lambda k, d="": {"title": "Latest Post", "link": "https://example.com/latest", "summary": "A summary"}.get(k, d)},
+                **{"get.side_effect": lambda k, d="": entry_data.get(k, d)},
             )
         ]
         # Ensure hasattr checks work

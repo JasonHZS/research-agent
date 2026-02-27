@@ -1,12 +1,12 @@
 'use client';
 
 import { memo, useState, useCallback } from 'react';
-import { User, Bot, Check, Copy } from 'lucide-react';
+import { User, Bot, Check, Copy, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ToolCallPanel } from './ToolCallPanel';
-import type { ChatMessage, ToolCall, MessageSegment } from '@/lib/types';
+import type { ChatMessage, ToolCall, MessageSegment, FeedDigestItem } from '@/lib/types';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -43,9 +43,10 @@ interface MessageActionsProps {
  */
 interface UserMessageBubbleProps {
   content: string;
+  attachedFeedCard?: FeedDigestItem;
 }
 
-const UserMessageBubble = memo(function UserMessageBubble({ content }: UserMessageBubbleProps) {
+const UserMessageBubble = memo(function UserMessageBubble({ content, attachedFeedCard }: UserMessageBubbleProps) {
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
@@ -56,7 +57,26 @@ const UserMessageBubble = memo(function UserMessageBubble({ content }: UserMessa
   }, [content]);
 
   return (
-    <div className="group relative">
+    <div className="group relative flex flex-col items-end gap-2">
+      {/* Attached feed card — shown above the message bubble */}
+      {attachedFeedCard && (
+        <a
+          href={attachedFeedCard.latest_url ?? '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-[200px] rounded-xl border border-orange-500/25 bg-orange-500/10 p-2.5 shadow-sm transition-colors hover:border-orange-500/50 hover:bg-orange-500/15"
+        >
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <FileText className="h-3 w-3 flex-shrink-0 text-orange-500/70" />
+            <span className="truncate text-[10px] text-orange-600/70 dark:text-orange-400/70">
+              {attachedFeedCard.feed_name}
+            </span>
+          </div>
+          <p className="line-clamp-2 text-[11px] font-medium leading-snug text-foreground/80">
+            {attachedFeedCard.latest_title_zh ?? attachedFeedCard.latest_title}
+          </p>
+        </a>
+      )}
       <div className="rounded-2xl px-4 py-2.5 bg-primary text-primary-foreground rounded-br-md break-words">
         <p className="whitespace-pre-wrap">{content}</p>
       </div>
@@ -215,7 +235,7 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* User message bubble */}
         {isUser && (
-          <UserMessageBubble content={message.content} />
+          <UserMessageBubble content={message.content} attachedFeedCard={message.attachedFeedCard} />
         )}
 
         {/* Message Actions (Copy) */}

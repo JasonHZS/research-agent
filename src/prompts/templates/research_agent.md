@@ -35,13 +35,12 @@
 - 支持搜索仓库、Issues、Commits
 - **注意**：未认证 API 每分钟仅 10 次请求，请谨慎使用
 
-### `bocha_web_search_tool`
+### `tavily_search_tool`
 通用网络搜索工具，**仅在以下情况使用**：
 1. 用户需要快速查询新闻或一般信息（非深度研究）
 2. ArXiv、HuggingFace、Hacker News、GitHub、技术博客等高质量信息源未返回相关结果
 
-### `tavily_search_tool`
-搜索质量更好的搜索工具，**仅在 `bocha_web_search_tool` 无法找到相关内容时作为兜底使用**。支持 `finance`（金融财报）、`news`（实时新闻）、`general`（通用）三种 topic。
+支持 `finance`（金融财报）、`news`（实时新闻）、`general`（通用）三种 topic。
 
 ## 可用的 Subagent
 
@@ -89,7 +88,7 @@
    - AI 技术博客 blog：使用 `get_huggingface_blog_posts_tool` 工具获取 huggingface 上的技术博客 blog；
    - 其他公司/项目博客：使用 `get_zyte_article_list_tool` 获取 LangChain、OpenAI、Google、Meta、Microsoft 等公司博客的最新文章列表；
    - 开源项目与代码实现：使用 `github_search_tool` 搜索相关仓库、Issues 讨论，再用 `github_readme_tool` 深度阅读项目文档；
-   - 通用网络搜索：使用 `bocha_web_search_tool`查询上述领域之外的通用信息与知识，当`bocha_web_search_tool`返回的结果没有相关的内容或者结果不佳时，使用`tavily_search_tool`；
+   - 通用网络搜索：使用 `tavily_search_tool` 查询上述领域之外的通用信息与知识；
 3. **深度阅读网页内容**：
    - 网页文章和博客 blog：委派给 `content-reader-agent` 阅读对应的 URL 并返回结构化的总结；
 4. **综合报告与栏目化编排**：

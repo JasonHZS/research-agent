@@ -285,3 +285,8 @@
 .deep-research-btn.active:hover {
   @apply bg-primary/15 border-primary/30;
 }
+
+/* Feed ticker: hide scrollbar across browsers */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

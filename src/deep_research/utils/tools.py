@@ -14,7 +14,7 @@ def get_all_research_tools(hn_mcp_tools: Optional[list] = None) -> list:
     组装 researcher 代理的所有研究工具。
 
     包含：
-    - 搜索工具 (ArXiv, HuggingFace, GitHub, Bocha, Tavily)
+    - 搜索工具 (ArXiv, HuggingFace, GitHub, Tavily)
     - 阅读工具 (Jina 或 Zyte，基于配置)
     - MCP 工具 (Hacker News)
 
@@ -27,7 +27,6 @@ def get_all_research_tools(hn_mcp_tools: Optional[list] = None) -> list:
     # 延迟导入以避免循环依赖
     from src.agent.subagents import get_main_agent_tools
     from src.tools.arxiv_api import get_arxiv_paper_tool, search_arxiv_papers_tool
-    from src.tools.bocha_search import bocha_web_search_tool
     from src.tools.tavily_search import tavily_search_tool
     from src.tools.github_search import github_readme_tool, github_search_tool
     from src.tools.hf_blog import get_huggingface_blog_posts_tool
@@ -43,8 +42,7 @@ def get_all_research_tools(hn_mcp_tools: Optional[list] = None) -> list:
         get_zyte_article_list_tool,
         github_search_tool,
         github_readme_tool,
-        bocha_web_search_tool,
-        tavily_search_tool,  # Fallback search for finance/news/specialized domains
+        tavily_search_tool,
     ]
 
     # 根据配置添加阅读工具

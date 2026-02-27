@@ -35,6 +35,9 @@ export function ChatContainer() {
     toggleDeepResearch,
     canToggleDeepResearch,
     lockDeepResearch,
+    droppedFeedCard,
+    setDroppedFeedCard,
+    clearDroppedFeedCard,
   } = useChatStore();
 
   const hasMessages = currentMessages.length > 0 || streamingMessage;
@@ -104,8 +107,14 @@ export function ChatContainer() {
         return;
       }
 
-      // Add user message to UI
-      addUserMessage(message);
+      // Append dropped feed card URL as context for the backend
+      const finalMessage = droppedFeedCard?.latest_url
+        ? `${message}\n\n请参考这篇文章：${droppedFeedCard.latest_url}`
+        : message;
+
+      // Show original message + card attachment in UI (not the appended URL)
+      addUserMessage(message, droppedFeedCard ?? undefined);
+      clearDroppedFeedCard();
 
       const requestId = generateId();
 
@@ -113,17 +122,19 @@ export function ChatContainer() {
       startStreaming(requestId);
 
       // Send message via SSE stream
-      await sendMessage(sessionId, message, currentModelProvider, currentModelName, isDeepResearch);
+      await sendMessage(sessionId, finalMessage, currentModelProvider, currentModelName, isDeepResearch);
     },
     [
       sessionId,
       currentModelProvider,
       currentModelName,
       isDeepResearch,
+      droppedFeedCard,
       addUserMessage,
       startStreaming,
       sendMessage,
       setError,
+      clearDroppedFeedCard,
     ]
   );
 
@@ -238,6 +249,9 @@ export function ChatContainer() {
               canToggleDeepResearch={canToggleDeepResearch}
               onLockDeepResearch={lockDeepResearch}
               showExamples={true}
+              droppedFeedCard={droppedFeedCard}
+              onDropFeedCard={setDroppedFeedCard}
+              onClearDroppedCard={clearDroppedFeedCard}
             />
           </div>
         ) : (
@@ -255,6 +269,9 @@ export function ChatContainer() {
               canToggleDeepResearch={canToggleDeepResearch}
               onLockDeepResearch={lockDeepResearch}
               showExamples={false}
+              droppedFeedCard={droppedFeedCard}
+              onDropFeedCard={setDroppedFeedCard}
+              onClearDroppedCard={clearDroppedFeedCard}
             />
           </>
         )}

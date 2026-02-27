@@ -63,6 +63,8 @@ export interface ChatMessage {
   segments?: MessageSegment[];
   /** Whether this message is a clarification question (Deep Research mode) */
   isClarification?: boolean;
+  /** Feed card attached via drag-to-chat (user messages only) */
+  attachedFeedCard?: FeedDigestItem;
   created_at: string;
 }
 
@@ -117,3 +119,30 @@ export interface StreamEvent {
  * Streaming status (simplified for SSE per-request model)
  */
 export type StreamingStatus = 'idle' | 'streaming' | 'error';
+
+/**
+ * Aggregated digest response from /api/feeds/digest
+ */
+export interface FeedDigestResponse {
+  items: FeedDigestItem[];
+  total_feeds: number;
+  feeds_with_updates: number;
+  fetched_at: string;
+  cached: boolean;
+  ttl_seconds: number;
+}
+
+/**
+ * A single RSS feed digest item (latest article from a feed)
+ */
+export interface FeedDigestItem {
+  feed_name: string;
+  category: string;
+  latest_title: string | null;
+  latest_title_zh: string | null;
+  latest_url: string | null;
+  latest_date: string | null;
+  latest_summary: string | null;
+  latest_summary_zh: string | null;
+  new_count: number;
+}

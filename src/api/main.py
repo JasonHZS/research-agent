@@ -16,10 +16,10 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.config.settings import resolve_api_settings
 from src.api.middleware import LoggingMiddleware
-from src.api.routes import chat_router, models_router
+from src.api.routes import chat_router, feeds_router, models_router
 from src.api.services.agent_service import get_agent_service
+from src.config.settings import resolve_api_settings
 from src.main import initialize_mcp_tools
 from src.utils.logging_config import configure_logging, get_logger
 
@@ -89,6 +89,7 @@ app.add_middleware(
 
 # Include routers (no conversations router - ephemeral mode)
 app.include_router(chat_router, prefix="/api")
+app.include_router(feeds_router, prefix="/api")
 app.include_router(models_router, prefix="/api")
 
 

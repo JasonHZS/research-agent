@@ -9,19 +9,24 @@ import difflib
 import logging
 import re
 import xml.etree.ElementTree as ET
-from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import feedparser
+import requests
 from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 
 # 全局文章数上限，防止撑爆 Agent 上下文窗口
 _MAX_ARTICLES = 100
+_HTTP_CONNECT_TIMEOUT_SECONDS = 5
+_HTTP_READ_TIMEOUT_SECONDS = 10
+_REQUEST_HEADERS = {"User-Agent": "ResearchAgent/1.0"}
 
 
 @dataclass
@@ -113,7 +118,13 @@ def _match_feed(query: str, feeds: list[FeedInfo]) -> list[FeedInfo]:
 def _fetch_single_feed(feed: FeedInfo, limit: int) -> list[FeedArticle]:
     """Fetch articles from a single RSS feed with timeout."""
     try:
-        parsed = feedparser.parse(feed.xml_url, request_headers={"User-Agent": "ResearchAgent/1.0"})
+        response = requests.get(
+            feed.xml_url,
+            headers=_REQUEST_HEADERS,
+            timeout=(_HTTP_CONNECT_TIMEOUT_SECONDS, _HTTP_READ_TIMEOUT_SECONDS),
+        )
+        response.raise_for_status()
+        parsed = feedparser.parse(response.content)
         if parsed.bozo and not parsed.entries:
             return []
 
@@ -122,12 +133,18 @@ def _fetch_single_feed(feed: FeedInfo, limit: int) -> list[FeedArticle]:
             published = None
             if hasattr(entry, "published_parsed") and entry.published_parsed:
                 try:
-                    published = datetime(*entry.published_parsed[:6]).strftime("%Y-%m-%d %H:%M")
+                    published = datetime(
+                        *entry.published_parsed[:6],
+                        tzinfo=timezone.utc,
+                    ).isoformat().replace("+00:00", "Z")
                 except (TypeError, ValueError):
                     pass
             elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
                 try:
-                    published = datetime(*entry.updated_parsed[:6]).strftime("%Y-%m-%d %H:%M")
+                    published = datetime(
+                        *entry.updated_parsed[:6],
+                        tzinfo=timezone.utc,
+                    ).isoformat().replace("+00:00", "Z")
                 except (TypeError, ValueError):
                     pass
 
@@ -145,6 +162,9 @@ def _fetch_single_feed(feed: FeedInfo, limit: int) -> list[FeedArticle]:
                 )
             )
         return articles
+    except requests.RequestException as exc:
+        logger.debug("Failed to fetch feed %s: %s", feed.xml_url, exc)
+        return []
     except Exception as exc:
         logger.debug("Failed to fetch feed %s: %s", feed.xml_url, exc)
         return []
@@ -267,7 +287,11 @@ def fetch_rss_articles_tool(
         except FuturesTimeoutError:
             pending = [f.name for fut, f in future_to_feed.items() if not fut.done()]
             failed.extend(pending)
-            logger.debug("RSS fetch timed out; %d feed(s) did not complete: %s", len(pending), pending)
+            logger.debug(
+                "RSS fetch timed out; %d feed(s) did not complete: %s",
+                len(pending),
+                pending,
+            )
     finally:
         # Do not block here; we already enforced the deadline above.
         executor.shutdown(wait=False, cancel_futures=True)

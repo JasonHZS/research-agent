@@ -15,6 +15,7 @@ from src.api.schemas.chat import (
     WebSocketEvent,
     WebSocketEventType,
 )
+from src.api.schemas.feeds import FeedDigestItem, FeedDigestResponse
 
 __all__ = [
     "ChatMessage",
@@ -23,6 +24,8 @@ __all__ = [
     "Conversation",
     "ConversationCreate",
     "ConversationSummary",
+    "FeedDigestItem",
+    "FeedDigestResponse",
     "ModelInfo",
     "StreamEvent",
     "StreamEventType",

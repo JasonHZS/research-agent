@@ -32,7 +32,7 @@
 - `github_readme_tool`: Read README content of a specific GitHub repository.
 
 ### 通用搜索
-- `bocha_web_search_tool`: General web search. Use as last resort when specialized sources return no results.
+- `tavily_search_tool`: General web search. Use as last resort when specialized sources return no results. Supports `finance`, `news`, and `general` topics.
 
 ### 完成工具
 - `research_complete`: Signal that you have finished researching this section. Include a brief summary and confidence level.

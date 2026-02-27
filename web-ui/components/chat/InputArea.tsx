@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Send, StopCircle, Loader2, Newspaper, ScrollText, ArrowRight } from 'lucide-react';
+import { Send, StopCircle, Loader2, Newspaper, ScrollText, ArrowRight, X, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ModelSelector } from '@/components/sidebar/ModelSelector';
 import { cn } from '@/lib/utils';
+import type { FeedDigestItem } from '@/lib/types';
 
 interface InputAreaProps {
   onSend: (message: string) => void;
@@ -20,6 +21,10 @@ interface InputAreaProps {
   /** Callback to lock (hide) the Deep Research toggle */
   onLockDeepResearch?: () => void;
   showExamples?: boolean;
+  /** Dropped feed card from drag-to-chat */
+  droppedFeedCard?: FeedDigestItem | null;
+  onDropFeedCard?: (card: FeedDigestItem) => void;
+  onClearDroppedCard?: () => void;
 }
 
 export function InputArea({
@@ -34,8 +39,12 @@ export function InputArea({
   canToggleDeepResearch = true,
   onLockDeepResearch,
   showExamples = false,
+  droppedFeedCard,
+  onDropFeedCard,
+  onClearDroppedCard,
 }: InputAreaProps) {
   const [input, setInput] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea
@@ -77,10 +86,80 @@ export function InputArea({
     [handleSubmit]
   );
 
+  // Drag-and-drop handlers for feed cards
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('application/feed-card')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Only clear if leaving the container entirely
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const data = e.dataTransfer.getData('application/feed-card');
+    if (data && onDropFeedCard) {
+      try {
+        onDropFeedCard(JSON.parse(data) as FeedDigestItem);
+        textareaRef.current?.focus();
+      } catch {}
+    }
+  }, [onDropFeedCard]);
+
   return (
-    <div className={cn('bg-background p-4', className)}>
+    <div
+      className={cn('bg-background p-4', className)}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="max-w-3xl mx-auto">
-        <div className="relative flex flex-col gap-2 bg-card border border-border rounded-2xl px-4 py-3 shadow-sm transition-shadow duration-300 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.4),0_0_40px_hsl(var(--primary)/0.2)] focus-within:border-primary/50">
+        <div className={cn(
+          "relative flex flex-col gap-2 bg-card border rounded-2xl px-4 py-3 shadow-sm transition-all duration-200 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.4),0_0_40px_hsl(var(--primary)/0.2)] focus-within:border-primary/50",
+          isDragOver
+            ? "border-orange-500/60 bg-orange-500/5 shadow-[0_0_20px_hsl(24_100%_50%/0.15)]"
+            : "border-border"
+        )}>
+          {/* Drop zone overlay */}
+          {isDragOver && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-orange-500/50 bg-orange-500/5">
+              <span className="text-sm font-medium text-orange-600 dark:text-orange-400">拖放文章到此处</span>
+            </div>
+          )}
+
+          {/* Dropped card preview — fixed-size mini card */}
+          {droppedFeedCard && (
+            <div className="flex items-start gap-0">
+              <div className="relative w-[200px] flex-shrink-0 rounded-xl border border-orange-500/25 bg-orange-500/10 p-2.5 shadow-sm">
+                {/* Close button */}
+                <button
+                  onClick={onClearDroppedCard}
+                  className="absolute right-1.5 top-1.5 rounded-full p-0.5 text-muted-foreground/50 transition-colors hover:bg-orange-500/15 hover:text-foreground"
+                  aria-label="移除文章"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+                {/* Icon + source */}
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <FileText className="h-3 w-3 flex-shrink-0 text-orange-500/70" />
+                  <span className="truncate text-[10px] text-orange-600/70 dark:text-orange-400/70">
+                    {droppedFeedCard.feed_name}
+                  </span>
+                </div>
+                {/* Title */}
+                <p className="line-clamp-2 text-[11px] font-medium leading-snug text-foreground/80 pr-3">
+                  {droppedFeedCard.latest_title_zh ?? droppedFeedCard.latest_title}
+                </p>
+              </div>
+            </div>
+          )}
           {/* Input textarea */}
           <textarea
             ref={textareaRef}

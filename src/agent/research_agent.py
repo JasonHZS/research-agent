@@ -35,7 +35,6 @@ from src.config.llm_factory import create_llm
 from src.config.settings import resolve_llm_settings, resolve_reader_type
 from src.prompts import load_prompt
 from src.tools.arxiv_api import get_arxiv_paper_tool, search_arxiv_papers_tool
-from src.tools.bocha_search import bocha_web_search_tool
 from src.tools.github_search import github_search_tool
 from src.tools.hf_blog import get_huggingface_blog_posts_tool
 from src.tools.hf_daily_papers import get_huggingface_papers_tool
@@ -162,9 +161,8 @@ def create_research_agent(
         get_arxiv_paper_tool,
         search_arxiv_papers_tool,
         get_zyte_article_list_tool,  # Fetch article list from any blog/news site
-        bocha_web_search_tool,  # General web search
         github_search_tool,  # Search GitHub repos, issues, commits (no auth)
-        tavily_search_tool,  # Fallback search for finance/news/specialized domains
+        tavily_search_tool,  # General web search
         list_rss_feeds_tool,  # List available RSS feeds from curated blog collection
         fetch_rss_articles_tool,  # Fetch recent articles from RSS feeds
         get_feeds_latest_overview_tool,  # Quick scan: latest title+date from every feed

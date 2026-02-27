@@ -35,9 +35,9 @@ logger = logging.getLogger(__name__)
 
 def _get_clarify_tools() -> list:
     """获取澄清阶段可用的搜索工具。"""
-    from src.tools.bocha_search import bocha_web_search_tool
+    from src.tools.tavily_search import tavily_search_tool
 
-    return [bocha_web_search_tool]
+    return [tavily_search_tool]
 
 
 async def clarify_with_user_node(

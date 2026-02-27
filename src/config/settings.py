@@ -42,6 +42,13 @@ ENV_API_PORT = "API_PORT"
 DEFAULT_API_HOST = "0.0.0.0"
 DEFAULT_API_PORT = 8111
 
+# Feed digest security env names and defaults
+ENV_FEEDS_ADMIN_TOKEN = "FEEDS_ADMIN_TOKEN"
+ENV_FEEDS_FORCE_REFRESH_RATE_LIMIT = "FEEDS_FORCE_REFRESH_RATE_LIMIT"
+ENV_FEEDS_FORCE_REFRESH_WINDOW_SECONDS = "FEEDS_FORCE_REFRESH_WINDOW_SECONDS"
+DEFAULT_FEEDS_FORCE_REFRESH_RATE_LIMIT = 5
+DEFAULT_FEEDS_FORCE_REFRESH_WINDOW_SECONDS = 60
+
 # Content reader env names and defaults
 ENV_CONTENT_READER_TYPE = "CONTENT_READER_TYPE"
 
@@ -86,6 +93,13 @@ class APISettings:
 
 
 @dataclass(frozen=True)
+class FeedDigestSecuritySettings:
+    admin_token: Optional[str]
+    force_refresh_rate_limit: int
+    force_refresh_window_seconds: int
+
+
+@dataclass(frozen=True)
 class RuntimeSettings:
     llm: LLMSettings
     deep_research: DeepResearchSettings
@@ -98,6 +112,7 @@ class AppSettings:
     deep_research: DeepResearchSettings
     reader_type: ReaderType
     api: APISettings
+    feed_digest_security: FeedDigestSecuritySettings
 
 
 def resolve_llm_settings(
@@ -196,6 +211,40 @@ def resolve_api_settings(env: Mapping[str, str] = os.environ) -> APISettings:
     return APISettings(host=host, port=port)
 
 
+def resolve_feed_digest_security_settings(
+    env: Mapping[str, str] = os.environ,
+) -> FeedDigestSecuritySettings:
+    admin_token = env.get(ENV_FEEDS_ADMIN_TOKEN)
+    if admin_token is not None:
+        admin_token = admin_token.strip() or None
+
+    try:
+        rate_limit = int(
+            env.get(
+                ENV_FEEDS_FORCE_REFRESH_RATE_LIMIT,
+                str(DEFAULT_FEEDS_FORCE_REFRESH_RATE_LIMIT),
+            )
+        )
+    except ValueError:
+        rate_limit = DEFAULT_FEEDS_FORCE_REFRESH_RATE_LIMIT
+
+    try:
+        window_seconds = int(
+            env.get(
+                ENV_FEEDS_FORCE_REFRESH_WINDOW_SECONDS,
+                str(DEFAULT_FEEDS_FORCE_REFRESH_WINDOW_SECONDS),
+            )
+        )
+    except ValueError:
+        window_seconds = DEFAULT_FEEDS_FORCE_REFRESH_WINDOW_SECONDS
+
+    return FeedDigestSecuritySettings(
+        admin_token=admin_token,
+        force_refresh_rate_limit=_clamp(rate_limit, 1, 200),
+        force_refresh_window_seconds=_clamp(window_seconds, 1, 3600),
+    )
+
+
 def resolve_reader_type(env: Mapping[str, str] = os.environ) -> ReaderType:
     if value := env.get(ENV_CONTENT_READER_TYPE):
         try:
@@ -262,6 +311,7 @@ def get_app_settings(env: Mapping[str, str] = os.environ) -> AppSettings:
         deep_research=resolve_deep_research_settings(env=env),
         reader_type=resolve_reader_type(env=env),
         api=resolve_api_settings(env=env),
+        feed_digest_security=resolve_feed_digest_security_settings(env=env),
     )
 
 

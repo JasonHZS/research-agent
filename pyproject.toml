@@ -33,6 +33,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
     "ruff>=0.5.0",
     "grandalf>=0.8.0",
     "mypy>=1.0.0",
@@ -48,6 +49,7 @@ packages = ["src"]
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
     "ruff>=0.5.0",
     "grandalf>=0.8.0",
     "mypy>=1.0.0",
@@ -59,4 +61,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 

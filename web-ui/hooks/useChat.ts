@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { api } from '@/lib/api';
-import type { ChatMessage, ModelInfo, ToolCall, MessageSegment, ResearchBrief } from '@/lib/types';
+import type { ChatMessage, ModelInfo, ToolCall, MessageSegment, ResearchBrief, FeedDigestItem } from '@/lib/types';
 import { generateId, getStoredSessionId, resetSessionId } from '@/lib/utils';
 
 /**
@@ -46,6 +46,11 @@ interface ChatState {
   isLoading: boolean;
   error: string | null;
 
+  // Dropped feed card (drag-to-chat)
+  droppedFeedCard: FeedDigestItem | null;
+  setDroppedFeedCard: (card: FeedDigestItem) => void;
+  clearDroppedFeedCard: () => void;
+
   // Session actions
   initSession: () => void;
   newChat: () => void;
@@ -58,7 +63,7 @@ interface ChatState {
   lockDeepResearch: () => void;
 
   // Message handling
-  addUserMessage: (content: string) => void;
+  addUserMessage: (content: string, attachedFeedCard?: FeedDigestItem) => void;
   startStreaming: (requestId: string) => void;
   appendToken: (content: string) => void;
   appendThinking: (content: string) => void;
@@ -85,6 +90,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   streamingMessage: null,
   isLoading: false,
   error: null,
+  droppedFeedCard: null,
 
   // Initialize session on page load, clearing any stale backend state
   initSession: () => {
@@ -160,13 +166,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Add user message to current conversation
-  addUserMessage: (content: string) => {
+  addUserMessage: (content: string, attachedFeedCard?: FeedDigestItem) => {
     const { currentMessages, isDeepResearch, canToggleDeepResearch } = get();
     const newMessage: ChatMessage = {
       id: generateId(),
       role: 'user',
       content,
       tool_calls: [],
+      attachedFeedCard,
       created_at: new Date().toISOString(),
     };
     
@@ -406,4 +413,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   clearMessages: () => {
     set({ currentMessages: [], streamingMessage: null, error: null });
   },
+
+  setDroppedFeedCard: (card) => set({ droppedFeedCard: card }),
+  clearDroppedFeedCard: () => set({ droppedFeedCard: null }),
 }));
