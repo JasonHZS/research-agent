@@ -14,6 +14,7 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 - **Multi-LLM Support**: Works with Aliyun (qwen3.5-plus, qwen-max, kimi-k2-thinking), Anthropic Claude, and OpenAI GPT
 - **Thinking Mode**: Optional thinking mode for supported models (qwen3.5-plus, qwen-max, DeepSeek-v3.2, kimi-k2-thinking)
 - **Modular Architecture**: High cohesion, low coupling design for easy extension
+- **Clerk Authentication**: 使用 [Clerk](https://clerk.com/) 作为用户登录管理第三方服务，支持 Web UI 与 API 统一认证
 
 ## Two Research Modes
 
@@ -96,6 +97,7 @@ graph TB
 - Node.js (for Hacker News MCP server via npx)
 - API key for Aliyun DashScope (default), Anthropic, or OpenAI
 - Jina API key (for web content reading)
+- Clerk 账号与密钥（使用 Web UI 时必需，见 [Clerk 用户认证](#clerk-用户认证)）
 
 ## Installation
 
@@ -221,13 +223,49 @@ npm install
 npm run dev
 
 # Or build for production
-npm run build
-npm run start
+npm run build && cp -r .next/static .next/standalone/.next/static
+npm run start:prod
 ```
 
 The frontend development server runs on `http://localhost:3000` by default.
 
 **Important**: The frontend needs to connect to the backend API, so make sure the backend service is running first.
+
+### Clerk 用户认证
+
+本项目的 Web UI 和 API 使用 [Clerk](https://clerk.com/) 作为用户登录管理服务，实现前后端统一的身份认证。
+
+#### 获取 Clerk 密钥
+
+1. 访问 [Clerk Dashboard](https://dashboard.clerk.com/)
+2. 创建应用或选择现有应用
+3. 在 **API Keys** 页面获取：
+   - **Publishable Key**：用于前端（以 `pk_` 开头）
+   - **Secret Key**：用于后端（以 `sk_` 开头）
+
+#### 前端配置
+
+在 `web-ui/` 目录下创建 `.env.local`（可参考 `web-ui/.env.local.example`）：
+
+```bash
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxx
+CLERK_SECRET_KEY=sk_test_xxxx
+```
+
+#### 后端配置
+
+在项目根目录的 `.env` 中添加：
+
+```bash
+# Clerk Authentication (required for API protection)
+CLERK_SECRET_KEY=sk_test_xxxx
+# 可选：指定允许的前端域名（逗号分隔），默认包含 localhost:3000 等开发地址
+# CLERK_AUTHORIZED_PARTIES=http://localhost:3000,https://your-production-domain.com
+```
+
+#### 部署说明
+
+生产环境下，Next.js 使用 standalone 模式时需确保 Clerk 环境变量正确加载（例如通过 `dotenv-cli`）。详见 [部署网络问题排查 - Clerk secretKey 缺失](docs/deployment-network-troubleshooting.md#31-clerk-secretkey-缺失)。
 
 ## Usage
 
@@ -459,6 +497,13 @@ ruff format src/
 3. Verify the API key has sufficient quota/credits
 4. For Jina Reader, ensure `JINA_API_KEY` is set
 
+### Clerk 认证问题
+
+1. 确保前后端均配置了正确的 Clerk 密钥（`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`、`CLERK_SECRET_KEY`）
+2. 生产环境 standalone 模式下，需通过 `dotenv-cli` 等方式加载 `.env.local`
+3. 跨域访问时，检查 `CLERK_AUTHORIZED_PARTIES` 是否包含前端域名
+4. 详见 [部署网络问题排查](docs/deployment-network-troubleshooting.md)
+
 ## License
 
 MIT License - See [LICENSE](LICENSE) for details.
@@ -471,3 +516,4 @@ MIT License - See [LICENSE](LICENSE) for details.
 - [mcp-hacker-news](https://github.com/erithwik/mcp-hn) - Hacker News integration
 - [Hugging Face](https://huggingface.co/) - Daily papers and blog source
 - [Jina AI](https://jina.ai/) - Web content reader
+- [Clerk](https://clerk.com/) - 用户登录与身份认证
