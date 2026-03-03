@@ -8,7 +8,7 @@ import { useChatStore } from '@/hooks/useChat';
 
 export default function Home() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const { initSession } = useChatStore();
+  const { initSession, currentMessages, streamingMessage } = useChatStore();
 
   // Initialize session on mount for signed-in users
   useEffect(() => {
@@ -21,6 +21,9 @@ export default function Home() {
 
     void initialize();
   }, [getToken, initSession, isLoaded, isSignedIn]);
+
+  // Check if there are any messages (hide FeedTicker when in conversation)
+  const hasMessages = currentMessages.length > 0 || streamingMessage;
 
   return (
     <>
@@ -40,11 +43,12 @@ export default function Home() {
         </div>
       </SignedOut>
       <SignedIn>
-        {/* Main Chat Area */}
-        <main className="flex-1 flex flex-col min-w-0 pb-[112px]">
+        {/* Main Chat Area - Remove bottom padding when in conversation */}
+        <main className={`flex-1 flex flex-col min-w-0 ${hasMessages ? '' : 'pb-[112px]'}`}>
           <ChatContainer />
         </main>
-        <FeedTicker />
+        {/* Only show FeedTicker when no messages (welcome screen) */}
+        {!hasMessages && <FeedTicker />}
       </SignedIn>
     </>
   );
