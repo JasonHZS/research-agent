@@ -59,7 +59,7 @@ def _get_model_config(
         model_provider: One of 'aliyun', 'anthropic', 'openai', or 'openrouter'.
         model_name: Specific model name.
         enable_thinking: Whether to enable thinking mode (only supported by some models
-                        like qwen3.5-plus, qwen-max, DeepSeek-v3.2, kimi-k2-thinking via DashScope).
+                        like qwen3.5-plus, qwen3-max, kimi-k2.5 via DashScope).
 
     Returns:
         Dictionary with model configuration for deepagents.
@@ -126,7 +126,7 @@ def create_research_agent(
         debug: If True, enables debug mode with detailed execution logs.
               Uses DeepAgents built-in debug streaming.
         enable_thinking: If True, enables thinking mode for supported models
-                        (e.g., DeepSeek-v3, kimi-k2-thinking via DashScope).
+                        (e.g., qwen3-max, kimi-k2.5 via DashScope).
                         The model will show its reasoning process.
 
     Returns:

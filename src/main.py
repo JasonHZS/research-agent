@@ -264,11 +264,11 @@ async def main(
         query: Research query to execute. If None, runs in interactive mode.
         model_provider: LLM provider ('aliyun', 'anthropic', or 'openai'). Resolved from
                        CLI > env MODEL_PROVIDER > default ('aliyun').
-        model_name: Specific model name (e.g., 'qwen3.5-plus', 'kimi-k2-thinking'). Resolved
+        model_name: Specific model name (e.g., 'qwen3.5-plus', 'kimi-k2.5'). Resolved
                     from CLI > env MODEL_NAME > provider defaults.
         verbose: If True, prints detailed execution logs including tool calls.
         enable_thinking: If True, enables thinking mode for supported models
-                        (e.g., DeepSeek-v3, kimi-k2-thinking via DashScope).
+                        (e.g., qwen3-max, kimi-k2.5 via DashScope).
                         Resolved from CLI > env ENABLE_THINKING > default (False).
         deep_research: If True, runs in Deep Research mode with supervisor-researcher
                       multi-agent architecture.
@@ -483,7 +483,7 @@ def run_cli() -> None:
         "--model",
         type=str,
         default=None,
-        help="Model name to use (default: env MODEL_NAME or provider default; e.g., 'qwen3.5-plus', 'kimi-k2-thinking', 'deepseek-v3.2', 'glm-5' for aliyun)",
+        help="Model name to use (default: env MODEL_NAME or provider default; e.g., 'qwen3.5-plus', 'kimi-k2.5', 'glm-5' for aliyun)",
     )
     parser.add_argument(
         "-v", "--verbose",

@@ -445,7 +445,7 @@ python -m src.main --deep-research -v
 python -m src.main --deep-research -p anthropic -q "Transformer 的注意力机制演进"
 
 # 使用特定模型
-python -m src.main --deep-research --model kimi-k2-thinking -q "LLM 推理优化技术"
+python -m src.main --deep-research --model kimi-k2.5 -q "LLM 推理优化技术"
 ```
 
 ### 编程调用

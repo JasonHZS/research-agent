@@ -30,7 +30,7 @@ python -m src.main --query "What are the latest LLM papers?"
 # Use different providers
 python -m src.main -p anthropic  # Use Claude
 python -m src.main -p openai     # Use GPT
-python -m src.main --model kimi-k2-thinking  # Use Kimi model
+python -m src.main --model kimi-k2.5  # Use Kimi model
 
 # Verbose mode (shows tool calls and agent steps)
 python -m src.main -v
@@ -134,7 +134,7 @@ system_prompt = load_prompt("content_reader", summary_format=summary_format)
 The agent supports three providers (configured in `src/agent/research_agent.py`):
 
 1. **Aliyun (Default)**: Uses DashScope API with OpenAI-compatible endpoint
-   - Models: `qwen3.5-plus` (default), `qwen-max`, `qwen3-max`, `kimi-k2-thinking`, `kimi-k2.5`, `deepseek-v3.2`, `glm-5`
+   - Models: `qwen3.5-plus` (default), `qwen3-max`, `kimi-k2.5`, `glm-5`
    - Requires `ALIYUN_API_KEY` or `DASHSCOPE_API_KEY`
    - Custom base URL: `ALIYUN_API_BASE_URL` (optional)
    - Note: `enable_thinking=True` only works with `aliyun` provider

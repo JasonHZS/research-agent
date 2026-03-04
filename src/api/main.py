@@ -117,6 +117,7 @@ def main():
         host=api_settings.host,
         port=api_settings.port,
         reload=True,
+        reload_dirs=["src"],
         log_level="info",
     )
 

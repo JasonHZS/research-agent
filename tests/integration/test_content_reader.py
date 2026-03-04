@@ -188,7 +188,7 @@ def main():
         "-m", "--model-name",
         type=str,
         default=None,
-        help="Model name (e.g., 'qwen3.5-plus', 'kimi-k2-thinking')",
+        help="Model name (e.g., 'qwen3.5-plus', 'kimi-k2.5')",
     )
 
     # MCP tools

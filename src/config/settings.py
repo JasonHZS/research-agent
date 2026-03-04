@@ -22,7 +22,7 @@ DEFAULT_MODEL_NAME_BY_PROVIDER = {
     "aliyun": "qwen3.5-plus",
     "anthropic": "claude-sonnet-4-20250514",
     "openai": "gpt-4o",
-    "openrouter": "anthropic/claude-sonnet-4.5",
+    "openrouter": "openai/gpt-5",
 }
 
 # Deep research env names and defaults

@@ -11,8 +11,8 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 - **Hacker News Integration**: Get trending stories and discussions via MCP
 - **Hugging Face Daily Papers**: Fetch daily featured AI/ML papers with titles and abstracts
 - **Hugging Face Blog**: Browse official and community blog posts with metadata
-- **Multi-LLM Support**: Works with Aliyun (qwen3.5-plus, qwen-max, kimi-k2-thinking), Anthropic Claude, and OpenAI GPT
-- **Thinking Mode**: Optional thinking mode for supported models (qwen3.5-plus, qwen-max, DeepSeek-v3.2, kimi-k2-thinking)
+- **Multi-LLM Support**: Works with Aliyun (qwen3.5-plus, qwen3-max, kimi-k2.5), Anthropic Claude, and OpenAI GPT
+- **Thinking Mode**: Optional thinking mode for supported models (qwen3.5-plus, qwen3-max, kimi-k2.5)
 - **Modular Architecture**: High cohesion, low coupling design for easy extension
 - **Clerk Authentication**: 使用 [Clerk](https://clerk.com/) 作为用户登录管理第三方服务，支持 Web UI 与 API 统一认证
 
@@ -145,7 +145,7 @@ Edit `.env` and add your API keys:
 # Get your key from: https://dashscope.console.aliyun.com/
 ALIYUN_API_KEY=your-aliyun-dashscope-api-key
 
-# Available models: qwen3.5-plus (default), qwen-max, kimi-k2-thinking
+# Available models: qwen3.5-plus (default), qwen3-max, kimi-k2.5
 
 # Or use alternative providers:
 # ANTHROPIC_API_KEY=your-anthropic-api-key
@@ -275,12 +275,12 @@ CLERK_SECRET_KEY=sk_test_xxxx
 # Run with default settings (Aliyun qwen3.5-plus)
 uv run python -m src.main
 
-# Use kimi-k2-thinking model
-uv run python -m src.main --model kimi-k2-thinking
+# Use kimi-k2.5 model
+uv run python -m src.main --model kimi-k2.5
 
 # Enable thinking mode (shows model's reasoning process)
 uv run python -m src.main --enable-thinking
-uv run python -m src.main --model kimi-k2-thinking --enable-thinking
+uv run python -m src.main --model kimi-k2.5 --enable-thinking
 
 # Use Anthropic or OpenAI instead
 uv run python -m src.main -p anthropic
@@ -318,7 +318,7 @@ uv run python -m src.main --deep-research -v
 uv run python -m src.main --deep-research -p anthropic -q "Transformer 的注意力机制演进"
 
 # Use a specific model
-uv run python -m src.main --deep-research --model kimi-k2-thinking -q "LLM 推理优化技术"
+uv run python -m src.main --deep-research --model kimi-k2.5 -q "LLM 推理优化技术"
 ```
 
 Deep Research 参数优先级：`CLI 参数 > 环境变量 > 默认值`。  
@@ -357,7 +357,7 @@ async def main():
             query="Summarize today's Hugging Face papers on transformers",
             mcp_tools=tools,
             model_provider="aliyun",  # or "anthropic", "openai"
-            model_name="qwen3.5-plus", # or "qwen-max", "kimi-k2-thinking"
+            model_name="qwen3.5-plus", # or "qwen3-max", "kimi-k2.5"
             enable_thinking=True,      # Enable thinking mode (optional)
         )
         print(result)
