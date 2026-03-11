@@ -115,14 +115,14 @@ export function InputArea({
 
   return (
     <div
-      className={cn('bg-background p-4', className)}
+      className={cn('bg-background p-3 sm:p-4', className)}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto w-full px-0 sm:px-0">
         <div className={cn(
-          "relative flex flex-col gap-2 bg-card border rounded-2xl px-4 py-3 shadow-sm transition-all duration-200 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.4),0_0_40px_hsl(var(--primary)/0.2)] focus-within:border-primary/50",
+          "relative flex flex-col gap-2 bg-card border rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-sm transition-all duration-200 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.4),0_0_40px_hsl(var(--primary)/0.2)] focus-within:border-primary/50",
           isDragOver
             ? "border-orange-500/60 bg-orange-500/5 shadow-[0_0_20px_hsl(24_100%_50%/0.15)]"
             : "border-border"
@@ -134,10 +134,10 @@ export function InputArea({
             </div>
           )}
 
-          {/* Dropped card preview — fixed-size mini card */}
+          {/* Dropped card preview — responsive mini card */}
           {droppedFeedCard && (
             <div className="flex items-start gap-0">
-              <div className="relative w-[200px] flex-shrink-0 rounded-xl border border-orange-500/25 bg-orange-500/10 p-2.5 shadow-sm">
+              <div className="relative w-[160px] sm:w-[200px] flex-shrink-0 rounded-xl border border-orange-500/25 bg-orange-500/10 p-2 sm:p-2.5 shadow-sm">
                 {/* Close button */}
                 <button
                   onClick={onClearDroppedCard}
@@ -172,28 +172,29 @@ export function InputArea({
             className="w-full resize-none bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground min-h-[60px] max-h-[300px] py-1 scrollbar-thin"
           />
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             {/* Deep Research Toggle - only show if enabled or still available to toggle */}
-            <div className="flex items-center">
+            <div className="flex items-center order-2 sm:order-1">
               {onToggleDeepResearch && (isDeepResearch || canToggleDeepResearch) && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onToggleDeepResearch}
                   className={cn(
-                    "deep-research-btn h-7 gap-1.5 px-3 text-xs font-medium rounded-lg border transition-all duration-200",
+                    "deep-research-btn h-7 gap-1.5 px-2 sm:px-3 text-xs font-medium rounded-lg border transition-all duration-200",
                     isDeepResearch 
                       ? "active" 
                       : "text-muted-foreground hover:text-foreground hover:bg-muted border-transparent"
                   )}
                   title={isDeepResearch ? "Deep Research Mode On" : "Enable Deep Research Mode"}
                 >
-                  Deep Research
+                  <span className="hidden sm:inline">Deep Research</span>
+                  <span className="sm:hidden">Deep</span>
                 </Button>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-end gap-2 order-1 sm:order-2">
               <ModelSelector
                 buttonVariant="ghost"
                 buttonSize="sm"
@@ -231,18 +232,18 @@ export function InputArea({
           </div>
         </div>
 
-        {/* Hint text */}
-        <p className="text-xs text-muted-foreground text-center mt-2">
+        {/* Hint text - hide on very small screens */}
+        <p className="text-xs text-muted-foreground text-center mt-2 hidden sm:block">
           Press <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Enter</kbd> to send,{' '}
           <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Shift + Enter</kbd> for new line
         </p>
 
         {/* Example Queries */}
         {showExamples && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 px-4 max-w-2xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-4 sm:mt-6 px-2 sm:px-4 max-w-2xl mx-auto">
           <button
             onClick={() => setInput('今天 hacker news 上有什么关于 AI 的帖子， 帮我总结一下其主要内容和评论区')}
-            className="group relative overflow-hidden rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:scale-[1.01] border border-orange-200/50 dark:border-orange-800/30"
+            className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 h-32 sm:h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:scale-[1.01] active:scale-[0.99] border border-orange-200/50 dark:border-orange-800/30 touch-manipulation"
           >
             {/* Gradient Background */}
             <div className="absolute inset-0 bg-gradient-to-br from-orange-100/80 via-amber-50/50 to-orange-50/80 dark:from-orange-900/20 dark:via-amber-900/10 dark:to-orange-900/20 opacity-100 transition-opacity" />
@@ -270,7 +271,7 @@ export function InputArea({
 
           <button
             onClick={() => setInput('最近一周huggingface 上的 top5 paper 都有哪些？帮我总结一下')}
-            className="group relative overflow-hidden rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:scale-[1.01] border border-orange-200/50 dark:border-orange-800/30"
+            className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 h-32 sm:h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:scale-[1.01] active:scale-[0.99] border border-orange-200/50 dark:border-orange-800/30 touch-manipulation"
           >
             {/* Gradient Background */}
             <div className="absolute inset-0 bg-gradient-to-br from-amber-100/80 via-orange-50/50 to-amber-50/80 dark:from-amber-900/20 dark:via-orange-900/10 dark:to-amber-900/20 opacity-100 transition-opacity" />

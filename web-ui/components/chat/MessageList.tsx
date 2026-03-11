@@ -89,8 +89,8 @@ export function MessageList({ className }: MessageListProps) {
           onWheel: handleWheel,
         }}
       >
-        <div ref={containerRef} className="p-4 md:p-6 max-w-3xl mx-auto">
-          <div className="space-y-6">
+        <div ref={containerRef} className="p-3 sm:p-4 md:p-6 max-w-3xl mx-auto pt-14 sm:pt-12">
+          <div className="space-y-4 sm:space-y-6">
             {/* Rendered messages */}
             {currentMessages.map((message) => (
               <MessageBubble key={message.id} message={message} />

@@ -81,6 +81,14 @@
   }
 }
 
+/* Safe area insets for notched phones */
+.safe-area-inset {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 /* Custom scrollbar */
 @layer utilities {
   .scrollbar-thin::-webkit-scrollbar {
@@ -158,21 +166,21 @@
 }
 
 .markdown-content table {
-  @apply w-full border-collapse my-4;
+  @apply w-full min-w-[280px] border-collapse my-4;
 }
 
 .markdown-content th,
 .markdown-content td {
-  @apply border border-border px-3 py-2 text-left;
+  @apply border border-border px-2 py-1.5 sm:px-3 sm:py-2 text-left text-sm sm:text-base;
 }
 
 .markdown-content th {
   @apply bg-muted font-medium;
 }
 
-/* Code block styles */
+/* Code block styles - horizontal scroll on mobile */
 .markdown-content pre {
-  @apply bg-muted rounded-lg p-4 overflow-x-auto my-4 text-sm;
+  @apply bg-muted rounded-lg p-3 sm:p-4 overflow-x-auto my-4 text-xs sm:text-sm;
 }
 
 .markdown-content code {

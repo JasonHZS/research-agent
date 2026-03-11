@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
@@ -9,6 +9,13 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Research Agent',
   description: 'AI-powered deep research assistant',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
 };
 
 // Script to initialize theme before hydration
@@ -35,7 +42,7 @@ export default function RootLayout({
           <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         </head>
         <body className={inter.className}>
-          <div className="flex h-screen overflow-hidden bg-background">
+          <div className="flex h-dvh min-h-screen overflow-hidden bg-background safe-area-inset">
             {children}
           </div>
         </body>

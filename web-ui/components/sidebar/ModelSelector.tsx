@@ -112,7 +112,7 @@ export const ModelSelector = memo(function ModelSelector({
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className="w-[300px] max-h-[500px] overflow-y-auto">
+      <DropdownMenuContent align={align} className="w-[300px] max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto">
         {sortedProviders.length === 0 ? (
           <div className="p-4 text-center text-sm text-muted-foreground">
             No models available
