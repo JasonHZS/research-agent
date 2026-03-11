@@ -172,13 +172,13 @@ export function ChatContainer() {
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Header - Floating on top */}
-      <header className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
-          <h1 className="font-semibold text-lg">Research Agent</h1>
+      {/* Header - Floating on top, responsive for mobile */}
+      <header className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 gap-2 min-h-[52px] sm:min-h-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <h1 className="font-semibold text-base sm:text-lg truncate">Research Agent</h1>
           {/* Streaming status indicator */}
           <div
-            className={`w-2 h-2 rounded-full ${
+            className={`w-2 h-2 rounded-full shrink-0 ${
               isStreaming
                 ? 'bg-yellow-500 animate-pulse'
                 : status === 'error'
@@ -187,21 +187,21 @@ export function ChatContainer() {
             }`}
             title={`Status: ${status}`}
           />
-          <div className="w-px h-4 bg-border mx-2" />
+          <div className="w-px h-4 bg-border mx-1 sm:mx-2 shrink-0 hidden sm:block" />
           <Button
             onClick={handleNewChat}
             disabled={isLoading || isStreaming}
             variant="outline"
             size="sm"
-            className="gap-2"
+            className="gap-1.5 sm:gap-2 shrink-0 h-8 sm:h-9 px-2 sm:px-3"
           >
             <Plus className="h-4 w-4" />
-            New Chat
+            <span className="hidden sm:inline">New Chat</span>
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground hidden sm:inline">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground hidden md:inline truncate max-w-[120px]">
             {currentModelName}
           </span>
           <Button
@@ -209,7 +209,7 @@ export function ChatContainer() {
             size="icon"
             onClick={toggleTheme}
             aria-label="Toggle theme"
-            className="h-9 w-9"
+            className="h-8 w-8 sm:h-9 sm:w-9"
           >
             <Sun className="h-4 w-4 dark:hidden" />
             <Moon className="h-4 w-4 hidden dark:block" />
@@ -218,7 +218,7 @@ export function ChatContainer() {
             variant="ghost"
             size="icon"
             asChild
-            className="h-9 w-9"
+            className="h-8 w-8 sm:h-9 sm:w-9 hidden sm:flex"
           >
             <a
               href="https://github.com/JasonHZS/research-agent"
@@ -237,14 +237,14 @@ export function ChatContainer() {
       <main className="flex-1 flex flex-col min-h-0">
         {!hasMessages ? (
           // Empty State: Centered Layout
-          <div className="flex-1 flex flex-col justify-center pb-[10vh]">
-            <div className="w-full max-w-3xl mx-auto px-4 mb-8">
+          <div className="flex-1 flex flex-col justify-center pb-[10vh] pt-14 sm:pt-0">
+            <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 mb-6 sm:mb-8">
               <div className="flex flex-col items-center justify-center text-center">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <Sun className="w-8 h-8 text-primary animate-[spin_12s_linear_infinite]" />
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3 sm:mb-4">
+                  <Sun className="w-7 h-7 sm:w-8 sm:h-8 text-primary animate-[spin_12s_linear_infinite]" />
                 </div>
-                <h2 className="text-2xl font-semibold mb-2">Start Your Research</h2>
-                <p className="text-muted-foreground max-w-md">
+                <h2 className="text-xl sm:text-2xl font-semibold mb-2">Start Your Research</h2>
+                <p className="text-muted-foreground max-w-md text-sm sm:text-base px-2">
                   Ask me about AI research, recent papers, tech trends, or anything else you'd like to explore.
                 </p>
               </div>

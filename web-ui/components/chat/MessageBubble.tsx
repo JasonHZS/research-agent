@@ -64,7 +64,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ content, attachedFee
           href={attachedFeedCard.latest_url ?? '#'}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-[200px] rounded-xl border border-orange-500/25 bg-orange-500/10 p-2.5 shadow-sm transition-colors hover:border-orange-500/50 hover:bg-orange-500/15"
+          className="w-[160px] sm:w-[200px] rounded-xl border border-orange-500/25 bg-orange-500/10 p-2 sm:p-2.5 shadow-sm transition-colors hover:border-orange-500/50 hover:bg-orange-500/15"
         >
           <div className="mb-1.5 flex items-center gap-1.5">
             <FileText className="h-3 w-3 flex-shrink-0 text-orange-500/70" />
@@ -77,17 +77,17 @@ const UserMessageBubble = memo(function UserMessageBubble({ content, attachedFee
           </p>
         </a>
       )}
-      <div className="rounded-2xl px-4 py-2.5 bg-primary text-primary-foreground rounded-br-md break-words">
-        <p className="whitespace-pre-wrap">{content}</p>
+      <div className="rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 bg-primary text-primary-foreground rounded-br-md break-words max-w-[min(80vw,100%)]">
+        <p className="whitespace-pre-wrap text-sm sm:text-base">{content}</p>
       </div>
-      {/* Copy button - appears on hover */}
+      {/* Copy button - always visible on mobile (touch), hover on desktop */}
       <Button
         variant="ghost"
         size="icon"
         className={cn(
-          'absolute -left-8 top-1/2 -translate-y-1/2 h-6 w-6 rounded-md',
+          'absolute -left-6 sm:-left-8 top-1/2 -translate-y-1/2 h-7 w-7 sm:h-6 sm:w-6 rounded-md touch-manipulation',
           'text-muted-foreground hover:bg-muted',
-          'opacity-0 group-hover:opacity-100 transition-opacity'
+          'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity'
         )}
         onClick={handleCopy}
         title="复制消息"

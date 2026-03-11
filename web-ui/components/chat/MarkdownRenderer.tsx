@@ -41,7 +41,7 @@ function CodeBlock({
     <div className="relative group">
       <button
         onClick={handleCopy}
-        className="absolute right-2 top-2 p-1.5 rounded-md bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+        className="absolute right-2 top-2 p-2 sm:p-1.5 rounded-md bg-background/80 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-muted touch-manipulation min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
         title="Copy code"
       >
         {copied ? (
