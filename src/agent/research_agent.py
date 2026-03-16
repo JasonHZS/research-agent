@@ -29,17 +29,21 @@ from langgraph.store.base import BaseStore
 
 from src.agent.subagents import (
     create_content_reader_subagent,
-    get_main_agent_tools,
 )
 from src.config.llm_factory import create_llm
 from src.config.settings import resolve_llm_settings, resolve_reader_type
 from src.prompts import load_prompt
 from src.tools.arxiv_api import get_arxiv_paper_tool, search_arxiv_papers_tool
 from src.tools.github_search import github_search_tool
+from src.tools.hacker_news import hn_tools
 from src.tools.hf_blog import get_huggingface_blog_posts_tool
 from src.tools.hf_daily_papers import get_huggingface_papers_tool
+from src.tools.rss_feeds import (
+    fetch_rss_articles_tool,
+    get_feeds_latest_overview_tool,
+    list_rss_feeds_tool,
+)
 from src.tools.tavily_search import tavily_search_tool
-from src.tools.rss_feeds import fetch_rss_articles_tool, get_feeds_latest_overview_tool, list_rss_feeds_tool
 from src.tools.zyte_reader import get_zyte_article_list_tool
 
 
@@ -77,7 +81,6 @@ def _get_model_config(
 
 
 def create_research_agent(
-    hn_mcp_tools: Optional[list] = None,
     model_provider: Optional[str] = None,
     model_name: Optional[str] = None,
     system_prompt: Optional[str] = None,
@@ -92,7 +95,7 @@ def create_research_agent(
 
     Architecture:
     - Main Agent: Coordinator with search/discovery tools
-        - Tools: HF papers list, ArXiv search/paper (native), HN stories
+        - Tools: HF papers list, ArXiv search/paper (native), HN stories (native)
     - Content Reader Sub-agent: Deep reading and summarization
         - Tools: Configurable reader (default Zyte, switchable via CONTENT_READER_TYPE)
 
@@ -111,7 +114,6 @@ def create_research_agent(
     - For disk persistence (across restarts), use SqliteSaver or PostgresSaver.
 
     Args:
-        hn_mcp_tools: Hacker News MCP tools (will be split between main/sub agent).
         model_provider: LLM provider ('aliyun', 'anthropic', 'openai', or 'openrouter').
                         Resolved via CLI/env/defaults via centralized settings when not set.
         model_name: Specific model to use. Resolved via CLI/env/defaults when not set.
@@ -139,7 +141,6 @@ def create_research_agent(
         >>> checkpointer = MemorySaver()
         >>> store = InMemoryStore()
         >>> agent = create_research_agent(
-        ...     hn_mcp_tools=hn_tools,
         ...     checkpointer=checkpointer,
         ...     store=store,
         ... )
@@ -153,8 +154,7 @@ def create_research_agent(
     content_reader = create_content_reader_subagent()
     subagents = [content_reader]
 
-    # Build main agent tools: Discovery/Search tools + ArXiv tools
-    # Main agent gets: HF papers list + ArXiv tools (native) + HN discovery tools + Blog article list
+    # Build main agent tools: Discovery/Search tools + ArXiv tools + HN tools (native)
     main_tools = [
         get_huggingface_papers_tool,
         get_huggingface_blog_posts_tool,
@@ -166,12 +166,8 @@ def create_research_agent(
         list_rss_feeds_tool,  # List available RSS feeds from curated blog collection
         fetch_rss_articles_tool,  # Fetch recent articles from RSS feeds
         get_feeds_latest_overview_tool,  # Quick scan: latest title+date from every feed
+        *hn_tools,  # Native Hacker News API tools
     ]
-
-    # Add discovery tools from HN MCP (getTopStories, getBestStories, etc.)
-    hn_main_tools = get_main_agent_tools(hn_mcp_tools)
-    if hn_main_tools:
-        main_tools.extend(hn_main_tools)
 
     # Resolve model settings (CLI > env > defaults)
     try:
@@ -228,7 +224,6 @@ def create_research_agent(
 
 def run_research(
     query: str,
-    hn_mcp_tools: Optional[list] = None,
     model_provider: Optional[str] = None,
     model_name: Optional[str] = None,
     agent: Optional[Any] = None,
@@ -249,7 +244,6 @@ def run_research(
 
     Args:
         query: The research question or topic to investigate.
-        hn_mcp_tools: Hacker News MCP tools for web content.
         model_provider: LLM provider to use ('aliyun', 'anthropic', 'openai', or 'openrouter').
                         Resolved via CLI/env/defaults when not set.
         model_name: Specific model name. Resolved via CLI/env/defaults when not set.
@@ -264,7 +258,6 @@ def run_research(
     """
     if agent is None:
         agent = create_research_agent(
-            hn_mcp_tools=hn_mcp_tools,
             model_provider=model_provider,
             model_name=model_name,
             enable_thinking=enable_thinking,
@@ -288,7 +281,6 @@ def run_research(
 
 async def run_research_async(
     query: str,
-    hn_mcp_tools: Optional[list] = None,
     model_provider: Optional[str] = None,
     model_name: Optional[str] = None,
     agent: Optional[Any] = None,
@@ -302,7 +294,6 @@ async def run_research_async(
 
     Args:
         query: The research question or topic to investigate.
-        hn_mcp_tools: Hacker News MCP tools for web content.
         model_provider: LLM provider to use ('aliyun', 'anthropic', 'openai', or 'openrouter').
                         Resolved via CLI/env/defaults when not set.
         model_name: Specific model name. Resolved via CLI/env/defaults when not set.
@@ -317,7 +308,6 @@ async def run_research_async(
     """
     if agent is None:
         agent = create_research_agent(
-            hn_mcp_tools=hn_mcp_tools,
             model_provider=model_provider,
             model_name=model_name,
             enable_thinking=enable_thinking,

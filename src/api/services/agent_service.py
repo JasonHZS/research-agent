@@ -8,8 +8,7 @@ from typing import Any, Optional
 
 import httpcore
 import httpx
-
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 
@@ -18,8 +17,6 @@ from src.agent.research_agent import (
     run_research_async,
     run_research_stream,
 )
-from src.deep_research.graph import build_deep_research_graph
-from src.deep_research.state import ClarificationStatus, Section
 from src.api.schemas.chat import (
     ModelInfo,
     StreamEvent,
@@ -29,6 +26,8 @@ from src.api.schemas.chat import (
 )
 from src.config.llm_factory import ALIYUN_MODELS, OPENROUTER_MODELS
 from src.config.settings import resolve_runtime_settings
+from src.deep_research.graph import build_deep_research_graph
+from src.deep_research.state import ClarificationStatus, Section
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -43,11 +42,6 @@ class AgentService:
         self._checkpointers: dict[tuple[str, bool], MemorySaver] = {}
         self._stores: dict[tuple[str, bool], InMemoryStore] = {}
         self._agent_configs: dict[str, tuple[str, Optional[str], bool]] = {}
-        self._hn_mcp_tools: Optional[list] = None
-
-    def set_mcp_tools(self, hn_mcp_tools: Optional[list]) -> None:
-        """Set MCP tools for agents."""
-        self._hn_mcp_tools = hn_mcp_tools
 
     def _get_or_create_agent(
         self,
@@ -63,7 +57,7 @@ class AgentService:
         )
         requested_provider = runtime_settings.llm.provider
         requested_model = runtime_settings.llm.model_name
-        
+
         state_key = (conversation_id, is_deep_research)
         checkpointer = self._checkpointers.get(state_key)
         store = self._stores.get(state_key)
@@ -104,7 +98,6 @@ class AgentService:
                     model=requested_model,
                 )
                 agent = build_deep_research_graph(
-                    hn_mcp_tools=self._hn_mcp_tools,
                     model_provider=requested_provider,
                     model_name=requested_model,
                     checkpointer=checkpointer,
@@ -118,14 +111,13 @@ class AgentService:
                     model=requested_model,
                 )
                 agent = create_research_agent(
-                    hn_mcp_tools=self._hn_mcp_tools,
                     model_provider=requested_provider,
                     model_name=requested_model,
                     checkpointer=checkpointer,
                     store=store,
                     debug=False,
                 )
-            
+
             logger.info(
                 "Agent ready",
                 conversation_id=conversation_id,
@@ -316,8 +308,8 @@ class AgentService:
         )
 
         agent = self._get_or_create_agent(
-            conversation_id, 
-            runtime_settings.llm.provider, 
+            conversation_id,
+            runtime_settings.llm.provider,
             runtime_settings.llm.model_name,
             is_deep_research=is_deep_research
         )
@@ -355,7 +347,7 @@ class AgentService:
         tool_call_start_times: dict[str, float] = {}  # Track start times for duration calc
         seen_tool_ids: set[str] = existing_tool_ids.copy()  # Start with existing IDs
         tool_call_counter = 0
-        
+
         # For Deep Research: track clarification status and brief from state updates
         clarification_sent = False
         brief_sent = False
@@ -375,7 +367,7 @@ class AgentService:
                     "max_tool_calls": runtime_settings.deep_research.max_tool_calls,
                 }
                 max_concurrency = runtime_settings.deep_research.max_concurrent
-            
+
             async for mode, chunk in run_research_stream(
                 query=message,
                 agent=agent,
@@ -389,7 +381,7 @@ class AgentService:
                     if not isinstance(message_chunk, AIMessage):
                         # Skip tool/system messages to prevent raw tool output from reaching UI
                         continue
-                    
+
                     # For Deep Research: only allow tokens from specific nodes
                     # Use whitelist approach - only final_report text should be displayed:
                     # - final_report: The main research report (displayed to user)
@@ -443,13 +435,13 @@ class AgentService:
                             # Handle LangGraph's Overwrite object
                             if hasattr(clarification_status, "value"):
                                 clarification_status = clarification_status.value
-                            
+
                             if clarification_status is not None:
                                 # Check if it's a ClarificationStatus instance or dict
                                 need_clarification = False
                                 question = ""
                                 verification = ""
-                                
+
                                 if isinstance(clarification_status, ClarificationStatus):
                                     need_clarification = clarification_status.need_clarification
                                     question = clarification_status.question
@@ -458,7 +450,7 @@ class AgentService:
                                     need_clarification = clarification_status.get("need_clarification", False)
                                     question = clarification_status.get("question", "")
                                     verification = clarification_status.get("verification", "")
-                                
+
                                 if need_clarification and question:
                                     # Need clarification: send clarification event
                                     yield StreamEvent(
@@ -477,13 +469,13 @@ class AgentService:
                         if is_deep_research and not brief_sent:
                             research_brief = node_data.get("research_brief")
                             sections = node_data.get("sections")
-                            
+
                             # Handle LangGraph's Overwrite object
                             if hasattr(research_brief, "value"):
                                 research_brief = research_brief.value
                             if hasattr(sections, "value"):
                                 sections = sections.value
-                            
+
                             if research_brief and sections:
                                 # Extract section info for the brief event
                                 section_list = []
@@ -498,7 +490,7 @@ class AgentService:
                                             "title": s.get("title", ""),
                                             "description": s.get("description", ""),
                                         })
-                                
+
                                 if section_list:
                                     yield StreamEvent(
                                         type=StreamEventType.BRIEF,
@@ -518,11 +510,11 @@ class AgentService:
                             if hasattr(msg, "tool_calls") and msg.tool_calls:
                                 for tc in msg.tool_calls:
                                     tool_id = tc.get("id", f"tc_{tool_call_counter}")
-                                    
+
                                     # Skip duplicates within this request
                                     if tool_id in seen_tool_ids:
                                         continue
-                                    
+
                                     seen_tool_ids.add(tool_id)
                                     tool_call_counter += 1
 
@@ -563,11 +555,11 @@ class AgentService:
                                     tool_call.result = self._format_tool_result(
                                         getattr(msg, "content", None)
                                     )
-                                    
+
                                     # Detect errors in tool result
                                     is_error = self._is_error_result(tool_call.result)
                                     tool_call.status = (
-                                        ToolCallStatus.FAILED if is_error 
+                                        ToolCallStatus.FAILED if is_error
                                         else ToolCallStatus.COMPLETED
                                     )
 
@@ -575,7 +567,7 @@ class AgentService:
                                     # Calculate duration
                                     start_time = tool_call_start_times.get(tool_id)
                                     duration_ms = round((time.time() - start_time) * 1000, 2) if start_time else None
-                                    
+
                                     # Log at different levels based on success/failure
                                     result_preview = str(tool_call.result)[:200] if tool_call.result else None
                                     if is_error:
@@ -617,11 +609,11 @@ class AgentService:
                     "Streaming connection closed early, retrying with non-streaming",
                     conversation_id=conversation_id,
                 )
-                
+
                 # Retry with exponential backoff for transient connection errors
                 max_retries = 5
                 base_delay = 1.0  # seconds
-                
+
                 for attempt in range(max_retries):
                     try:
                         if attempt > 0:
@@ -634,7 +626,7 @@ class AgentService:
                                 conversation_id=conversation_id,
                             )
                             await asyncio.sleep(delay)
-                        
+
                         final_text = await run_research_async(
                             query=message,
                             agent=agent,
@@ -738,19 +730,19 @@ class AgentService:
                                             tool_call.result = self._format_tool_result(
                                                 getattr(msg, "content", None)
                                             )
-                                            
+
                                             # Detect errors in tool result
                                             is_error = self._is_error_result(tool_call.result)
                                             tool_call.status = (
-                                                ToolCallStatus.FAILED if is_error 
+                                                ToolCallStatus.FAILED if is_error
                                                 else ToolCallStatus.COMPLETED
                                             )
-                                            
+
                                             completed_tool_ids.add(tool_id)
                                             # Calculate duration (may not be accurate in fallback path)
                                             start_time = tool_call_start_times.get(tool_id)
                                             duration_ms = round((time.time() - start_time) * 1000, 2) if start_time else None
-                                            
+
                                             # Log at different levels based on success/failure (fallback path)
                                             result_preview = str(tool_call.result)[:200] if tool_call.result else None
                                             if is_error:
@@ -820,10 +812,10 @@ class AgentService:
                             },
                         )
                         return  # Success, exit retry loop
-                        
+
                     except Exception as fallback_error:
                         is_retryable = self._is_stream_disconnect_error(fallback_error)
-                        
+
                         if is_retryable and attempt < max_retries - 1:
                             logger.warning(
                                 "Retry failed with retryable error",
@@ -832,7 +824,7 @@ class AgentService:
                                 error=str(fallback_error),
                             )
                             continue  # Try again
-                        
+
                         # Final attempt failed or non-retryable error
                         logger.error(
                             "Non-streaming fallback failed",

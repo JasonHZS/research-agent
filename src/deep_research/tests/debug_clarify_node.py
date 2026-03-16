@@ -10,9 +10,8 @@ import asyncio
 import os
 import uuid
 
-from langchain_core.messages import HumanMessage
-from langchain_core.runnables import RunnableConfig
 from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage
 
 from src.deep_research.graph import build_deep_research_graph
 

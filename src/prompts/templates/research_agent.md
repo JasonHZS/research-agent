@@ -25,7 +25,15 @@
 获取指定 ArXiv ID 的论文详细信息，包括标题、作者、**摘要**、分类、PDF 链接等。
 
 ### Hacker News Tools
-获取 Hacker News 热门故事和讨论列表，用户没指定的时候，默认只获取 top10 的 story。
+Hacker News 现在提供以下原生工具：
+- `get_hn_top_stories` / `get_hn_best_stories` / `get_hn_new_stories`：获取热门、高分、最新 stories，用于快速把握技术圈当下关注点；
+- `get_hn_ask_stories` / `get_hn_show_stories` / `get_hn_job_stories`：分别获取 Ask HN、Show HN、招聘帖子，适合研究社区问答、项目展示和 hiring 信号；
+- `get_hn_item`：查看单条 story/comment/job 的详细信息；
+- `get_hn_comments`：读取某个 story 的评论讨论，适合寻找用户反馈、质疑点和负面信号；
+- `get_hn_user`：查看特定用户画像；
+- `get_hn_max_item_id` / `get_hn_updates`：查看最新 item ID 和近期活跃更新，适合追踪实时变化。
+
+用户没指定时，优先从 `get_hn_top_stories` 开始；如果某条 story 值得深挖，再继续调用 `get_hn_item` 和 `get_hn_comments`。
 
 ### `get_zyte_article_list_tool`
 获取任意博客或新闻网站的文章列表，返回标题、URL、发布日期等。适用于发现 LangChain、OpenAI、Google 等公司官方博客的最新文章。

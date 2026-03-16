@@ -21,53 +21,6 @@ from src.tools.jina_reader import get_jina_reader_tool
 from src.tools.zyte_reader import get_zyte_reader_tool
 
 
-# Hacker News: all known discovery tools loaded from the MCP server.
-# We bind them explicitly to the main agent (search/discovery), none to reader.
-HN_SEARCH_TOOL_NAMES = {
-    "getTopStories",
-    "getBestStories",
-    "getNewStories",
-    "getAskHNStories",
-    "getShowHNStories",
-    "getJobStories",
-    "getItem",
-    "getUser",
-    "getComments",
-    "getMaxItemId",
-    "getUpdates",
-}
-
-HN_READER_TOOL_NAMES: set[str] = set()
-
-
-def _select_tools(mcp_tools: list | None, allowed_names: set[str]) -> list:
-    """Return tools whose names (case-insensitive) are in allowed_names."""
-    if not mcp_tools or not allowed_names:
-        return []
-    allowed_lower = {name.lower() for name in allowed_names}
-    return [tool for tool in mcp_tools if tool.name.lower() in allowed_lower]
-
-
-def get_reader_agent_tools(mcp_tools: list | None) -> list:
-    """
-    Get MCP tools for the Content Reader agent (reading/consumption).
-
-    Returns tools explicitly designated for deep content reading from MCP.
-    Currently none - URL reading is handled by the built-in Jina Reader tool.
-    """
-    return _select_tools(mcp_tools, HN_READER_TOOL_NAMES)
-
-
-def get_main_agent_tools(mcp_tools: list | None) -> list:
-    """
-    Get MCP tools for the Main Research agent (search/discovery).
-
-    Returns tools explicitly designated for discovery and search:
-    - Hacker News: getTopStories, getBestStories, getNewStories, etc.
-    """
-    return _select_tools(mcp_tools, HN_SEARCH_TOOL_NAMES)
-
-
 def _get_reader_tool():
     """
     Get the configured content reader tool based on environment configuration.

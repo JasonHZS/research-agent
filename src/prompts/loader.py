@@ -18,10 +18,10 @@ class PromptLoader:
     This class provides a convenient way to load markdown prompt templates
     and render them with dynamic variables.
     """
-    
+
     _instance: Optional["PromptLoader"] = None
     _env: Optional[Environment] = None
-    
+
     def __init__(self, templates_dir: Optional[Path] = None):
         """
         Initialize the PromptLoader.
@@ -32,7 +32,7 @@ class PromptLoader:
         """
         if templates_dir is None:
             templates_dir = Path(__file__).parent / "templates"
-        
+
         self.templates_dir = templates_dir
         self._env = Environment(
             loader=FileSystemLoader(str(templates_dir)),
@@ -40,14 +40,14 @@ class PromptLoader:
             trim_blocks=True,
             lstrip_blocks=True,
         )
-    
+
     @classmethod
     def get_instance(cls) -> "PromptLoader":
         """Get or create the singleton instance."""
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-    
+
     def load(self, template_name: str, **kwargs: Any) -> str:
         """
         Load and render a prompt template.
@@ -64,10 +64,10 @@ class PromptLoader:
         """
         if not template_name.endswith(".md"):
             template_name = f"{template_name}.md"
-        
+
         template = self._env.get_template(template_name)
         return template.render(**kwargs)
-    
+
     def list_templates(self) -> list[str]:
         """
         List all available prompt templates.

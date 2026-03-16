@@ -49,7 +49,7 @@ def test_jina_reader():
     print("\n" + "-" * 60)
 
 
-def test_jina_reader_with_custom_url(url: str):
+def run_jina_reader_with_custom_url(url: str):
     """Test the Jina AI Reader tool with a custom URL."""
     load_dotenv()
 
@@ -78,6 +78,6 @@ if __name__ == "__main__":
     # If a URL is provided as command line argument, use it
     if len(sys.argv) > 1:
         custom_url = sys.argv[1]
-        test_jina_reader_with_custom_url(custom_url)
+        run_jina_reader_with_custom_url(custom_url)
     else:
         test_jina_reader()

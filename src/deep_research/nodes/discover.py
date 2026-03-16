@@ -5,6 +5,7 @@ Discover Node
 这是"先整体检索，再分别深入"策略的第一步。
 """
 
+import operator
 from typing import Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -22,11 +23,8 @@ from ..structured_outputs import DiscoveryResult, get_researcher_tools
 from ..utils.llm import get_llm
 from ..utils.state import get_state_value
 
-import operator
-
 logger = get_logger(__name__)
 from typing import Annotated
-
 
 # ==============================================================================
 # 内部状态（用于发现子图）

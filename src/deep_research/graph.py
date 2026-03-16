@@ -35,9 +35,8 @@ from .state import (
     AgentOutputState,
     AgentState,
 )
-from .utils.tools import get_all_research_tools
 from .utils.state import get_state_value
-
+from .utils.tools import get_all_research_tools
 
 # ==============================================================================
 # 辅助节点：Aggregate
@@ -75,8 +74,8 @@ async def aggregate_sections_node(
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.store.base import BaseStore
 
+
 def build_deep_research_graph(
-    hn_mcp_tools: Optional[list] = None,
     model_provider: str = "aliyun",
     model_name: Optional[str] = None,
     checkpointer: Optional[BaseCheckpointSaver] = None,
@@ -86,7 +85,7 @@ def build_deep_research_graph(
     构建完整的深度研究图。
 
     流程:
-    clarify -> analyze -> discover (list类型) -> plan_sections -> dispatch (Send) 
+    clarify -> analyze -> discover (list类型) -> plan_sections -> dispatch (Send)
                             |                ^
                             |                |
                             +-- (其他类型) ---+
@@ -96,15 +95,16 @@ def build_deep_research_graph(
            |_________________________| (if gaps exist)
 
     Args:
-        hn_mcp_tools: Hacker News MCP 工具（可选）。
         model_provider: LLM 提供商。
         model_name: 具体模型名称。
+        checkpointer: Checkpointer for conversation state persistence.
+        store: Store for file persistence.
 
     Returns:
         编译后的 StateGraph，准备执行。
     """
     # 组装所有研究工具
-    all_tools = get_all_research_tools(hn_mcp_tools)
+    all_tools = get_all_research_tools()
 
     # 构建 researcher 子图
     researcher_subgraph = build_researcher_subgraph(all_tools)

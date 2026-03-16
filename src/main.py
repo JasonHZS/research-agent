@@ -1,8 +1,7 @@
 """
 Research Agent Main Entry Point
 
-This module provides the main entry point for running the research agent
-with MCP tools integration.
+This module provides the main entry point for running the research agent.
 
 Multi-turn Conversation Support:
 - Uses MemorySaver to persist conversation state across turns
@@ -20,11 +19,9 @@ import asyncio
 import os
 import sys
 import uuid
-from dataclasses import dataclass
 from typing import Any, Optional
 
 from dotenv import load_dotenv
-from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 
@@ -35,7 +32,6 @@ from src.agent.research_agent import (
 )
 from src.config.settings import resolve_runtime_settings
 from src.deep_research import build_deep_research_graph, run_deep_research
-from src.config.mcp_config import get_single_server_config
 from src.utils.logging_config import configure_logging, get_logger
 from src.utils.stream_display import StreamDisplay
 
@@ -44,72 +40,7 @@ configure_logging()
 logger = get_logger(__name__)
 
 
-@dataclass
-class MCPToolsContext:
-    """Container for MCP clients and their tools."""
-
-    hn_client: Optional[MultiServerMCPClient] = None
-    hn_tools: list = None
-
-    def __post_init__(self):
-        if self.hn_tools is None:
-            self.hn_tools = []
-
-    async def cleanup(self):
-        """Clean up all MCP clients."""
-        # As of langchain-mcp-adapters 0.1.0, clients don't need explicit cleanup
-        # when not used as context managers
-        pass
-
-
-async def _load_mcp_server_tools(
-    server_name: str,
-) -> tuple[Optional[MultiServerMCPClient], list]:
-    """
-    Load tools from a single MCP server.
-
-    As of langchain-mcp-adapters 0.1.0, MultiServerMCPClient no longer supports
-    context manager usage. Instead, directly create client and call get_tools().
-
-    Args:
-        server_name: Name of the MCP server to load.
-
-    Returns:
-        Tuple of (MCP client instance, list of loaded tools).
-    """
-    try:
-        config = get_single_server_config(server_name)
-        client = MultiServerMCPClient({server_name: config})
-        # In langchain-mcp-adapters 0.1.0+, get_tools() handles connection internally
-        tools = await client.get_tools()
-        logger.debug("MCP tools loaded", server=server_name, tool_count=len(tools))
-        return client, tools
-    except Exception as e:
-        logger.warning("Could not load MCP tools", server=server_name, error=str(e))
-        return None, []
-
-
-async def initialize_mcp_tools() -> MCPToolsContext:
-    """
-    Initialize MCP clients and load tools from configured servers.
-
-    Returns:
-        MCPToolsContext containing clients and tools for each server.
-    """
-    ctx = MCPToolsContext()
-
-    # Load Hacker News MCP tools
-    ctx.hn_client, ctx.hn_tools = await _load_mcp_server_tools("hackernews")
-
-    total_tools = len(ctx.hn_tools)
-    if total_tools == 0:
-        logger.info("No MCP tools loaded, continuing with built-in tools only")
-
-    return ctx
-
-
 def _create_session_agent(
-    mcp_ctx: MCPToolsContext,
     model_provider: str,
     model_name: Optional[str],
     checkpointer: MemorySaver,
@@ -121,7 +52,6 @@ def _create_session_agent(
     Create a research agent configured for multi-turn conversation.
 
     Args:
-        mcp_ctx: MCP tools context.
         model_provider: LLM provider.
         model_name: Model name.
         checkpointer: MemorySaver for conversation state.
@@ -133,7 +63,6 @@ def _create_session_agent(
         Configured agent instance.
     """
     return create_research_agent(
-        hn_mcp_tools=mcp_ctx.hn_tools,
         model_provider=model_provider,
         model_name=model_name,
         checkpointer=checkpointer,
@@ -145,7 +74,6 @@ def _create_session_agent(
 
 async def main_deep_research(
     query: str,
-    mcp_ctx: MCPToolsContext,
     model_provider: str,
     model_name: Optional[str],
     max_iterations: int,
@@ -164,7 +92,6 @@ async def main_deep_research(
 
     Args:
         query: Research query to execute.
-        mcp_ctx: MCP tools context.
         model_provider: LLM provider.
         model_name: Model name.
         max_iterations: Maximum supervisor iterations.
@@ -179,7 +106,6 @@ async def main_deep_research(
 
     # Build the deep research graph
     graph = build_deep_research_graph(
-        hn_mcp_tools=mcp_ctx.hn_tools,
         model_provider=model_provider,
         model_name=model_name,
     )
@@ -343,9 +269,6 @@ async def main(
         thinking=resolved_enable_thinking,
     )
 
-    # Initialize MCP tools (per server)
-    mcp_ctx = await initialize_mcp_tools()
-
     # Deep Research Mode
     if deep_research:
         if not query:
@@ -363,7 +286,6 @@ async def main(
         try:
             await main_deep_research(
                 query=query,
-                mcp_ctx=mcp_ctx,
                 model_provider=resolved_provider,
                 model_name=resolved_model_name,
                 max_iterations=resolved_max_iterations,
@@ -373,7 +295,7 @@ async def main(
                 verbose=verbose,
             )
         finally:
-            await mcp_ctx.cleanup()
+            pass  # No cleanup needed
         return
 
     # Standard Research Agent Mode
@@ -388,7 +310,6 @@ async def main(
     # Create a single agent instance for the entire session
     # Pass debug=verbose to enable DeepAgents built-in debug mode
     agent = _create_session_agent(
-        mcp_ctx=mcp_ctx,
         model_provider=resolved_provider,
         model_name=resolved_model_name,
         checkpointer=checkpointer,
@@ -397,67 +318,63 @@ async def main(
         enable_thinking=resolved_enable_thinking,
     )
 
-    try:
-        if query:
-            # Single query mode (still uses checkpointer for potential follow-ups)
-            print(f"\nResearch Query: {query}\n")
-            print("-" * 60)
-            result = await run_research_async(
-                query=query,
-                agent=agent,
-                thread_id=thread_id,
-                enable_thinking=resolved_enable_thinking,
-            )
-            print("\n" + result)
-        else:
-            # Interactive mode with multi-turn conversation support
-            print("\nEntering interactive mode. Type 'quit' to exit.")
-            print("Conversation history is preserved across turns.")
-            if verbose:
-                print("Debug mode: ON - showing detailed execution logs")
-            print()
-            while True:
-                try:
-                    user_input = input("\n📚 Research Query: ").strip()
-                    if user_input.lower() in ("quit", "exit", "q"):
-                        print("Goodbye!")
-                        break
-                    if user_input.lower() == "new":
-                        # Start a new conversation thread
-                        thread_id = str(uuid.uuid4())
-                        print(f"🔄 New session started. Session ID: {thread_id[:8]}...")
-                        continue
-                    if not user_input:
-                        continue
-
-                    print("\n🔍 Researching...\n")
-
-                    # Use streaming to show execution progress with token-level output
-                    display = StreamDisplay(verbose=verbose)
-                    final_content = ""
-
-                    # Mixed mode streaming: updates for tool calls, messages for tokens
-                    async for mode, chunk in run_research_stream(
-                        query=user_input,
-                        agent=agent,
-                        thread_id=thread_id,
-                    ):
-                        result = display.process_stream_chunk(mode, chunk)
-                        if result:
-                            final_content = result
-
-                    # Show final content separator (content already printed via streaming)
-                    print("\n" + "-" * 60)
-                    if final_content:
-                        # Content was already streamed, just show separator
-                        pass
-                    print("-" * 60)
-                except KeyboardInterrupt:
-                    print("\n\nGoodbye!")
+    if query:
+        # Single query mode (still uses checkpointer for potential follow-ups)
+        print(f"\nResearch Query: {query}\n")
+        print("-" * 60)
+        result = await run_research_async(
+            query=query,
+            agent=agent,
+            thread_id=thread_id,
+            enable_thinking=resolved_enable_thinking,
+        )
+        print("\n" + result)
+    else:
+        # Interactive mode with multi-turn conversation support
+        print("\nEntering interactive mode. Type 'quit' to exit.")
+        print("Conversation history is preserved across turns.")
+        if verbose:
+            print("Debug mode: ON - showing detailed execution logs")
+        print()
+        while True:
+            try:
+                user_input = input("\n📚 Research Query: ").strip()
+                if user_input.lower() in ("quit", "exit", "q"):
+                    print("Goodbye!")
                     break
-    finally:
-        # Clean up MCP clients
-        await mcp_ctx.cleanup()
+                if user_input.lower() == "new":
+                    # Start a new conversation thread
+                    thread_id = str(uuid.uuid4())
+                    print(f"🔄 New session started. Session ID: {thread_id[:8]}...")
+                    continue
+                if not user_input:
+                    continue
+
+                print("\n🔍 Researching...\n")
+
+                # Use streaming to show execution progress with token-level output
+                display = StreamDisplay(verbose=verbose)
+                final_content = ""
+
+                # Mixed mode streaming: updates for tool calls, messages for tokens
+                async for mode, chunk in run_research_stream(
+                    query=user_input,
+                    agent=agent,
+                    thread_id=thread_id,
+                ):
+                    result = display.process_stream_chunk(mode, chunk)
+                    if result:
+                        final_content = result
+
+                # Show final content separator (content already printed via streaming)
+                print("\n" + "-" * 60)
+                if final_content:
+                    # Content was already streamed, just show separator
+                    pass
+                print("-" * 60)
+            except KeyboardInterrupt:
+                print("\n\nGoodbye!")
+                break
 
 
 def run_cli() -> None:

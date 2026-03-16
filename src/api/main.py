@@ -18,13 +18,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.middleware import LoggingMiddleware
 from src.api.routes import chat_router, feeds_router, models_router
-from src.api.services.agent_service import get_agent_service
 from src.config.settings import (
     DEFAULT_CLERK_AUTHORIZED_PARTIES,
     resolve_api_settings,
     resolve_clerk_settings,
 )
-from src.main import initialize_mcp_tools
 from src.utils.logging_config import configure_logging, get_logger
 
 # Load environment variables
@@ -41,30 +39,12 @@ async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events."""
     # Startup
     logger.info("Starting Research Agent API", mode="ephemeral")
-
-    # Initialize MCP tools (Hacker News)
-    mcp_ctx = None
-    try:
-        logger.info("Loading MCP tools", server="hacker_news")
-        mcp_ctx = await initialize_mcp_tools()
-        hn_count = len(mcp_ctx.hn_tools) if mcp_ctx and mcp_ctx.hn_tools else 0
-        get_agent_service().set_mcp_tools(mcp_ctx.hn_tools if mcp_ctx else [])
-        logger.info("MCP tools loaded", server="hacker_news", tool_count=hn_count)
-    except Exception as e:
-        logger.warning("Failed to load MCP tools", error=str(e), exc_info=True)
-
     logger.info("API ready", persistence="ephemeral")
 
     yield
 
     # Shutdown
     logger.info("Shutting down API")
-    if mcp_ctx:
-        try:
-            await mcp_ctx.cleanup()
-            logger.debug("MCP cleanup completed")
-        except Exception as e:
-            logger.warning("MCP cleanup failed", error=str(e))
 
 
 # Create FastAPI app
