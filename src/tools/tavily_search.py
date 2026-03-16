@@ -16,7 +16,6 @@ from langchain_core.tools import tool
 from pydantic import BaseModel
 from tavily import TavilyClient
 
-
 # Type definitions
 SearchDepth = Literal["basic", "advanced"]
 SearchTopic = Literal["general", "news", "finance"]

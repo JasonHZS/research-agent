@@ -15,7 +15,6 @@ import requests
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-
 # GitHub API base URL
 GITHUB_API_BASE = "https://api.github.com"
 

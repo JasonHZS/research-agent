@@ -191,21 +191,21 @@ def _parse_weekly_papers_page(html_content: str, week: str) -> list[dict]:
             div = soup.find("div", attrs={"data-target": target})
             if div and div.has_attr("data-props"):
                 props = json.loads(div["data-props"])
-                
+
                 # Try different possible keys for papers data
                 papers_data = None
                 for key in ["dailyPapers", "weeklyPapers", "papers"]:
                     if key in props:
                         papers_data = props[key]
                         break
-                
+
                 if papers_data:
                     for entry in papers_data:
                         paper_data = entry.get("paper", entry)
-                        
+
                         arxiv_id = paper_data.get("id")
                         title = paper_data.get("title")
-                        
+
                         if arxiv_id and title:
                             papers.append({
                                 "title": title,
@@ -246,21 +246,21 @@ def _parse_monthly_papers_page(html_content: str, month: str) -> list[dict]:
             div = soup.find("div", attrs={"data-target": target})
             if div and div.has_attr("data-props"):
                 props = json.loads(div["data-props"])
-                
+
                 # Try different possible keys for papers data
                 papers_data = None
                 for key in ["dailyPapers", "monthlyPapers", "papers"]:
                     if key in props:
                         papers_data = props[key]
                         break
-                
+
                 if papers_data:
                     for entry in papers_data:
                         paper_data = entry.get("paper", entry)
-                        
+
                         arxiv_id = paper_data.get("id")
                         title = paper_data.get("title")
-                        
+
                         if arxiv_id and title:
                             papers.append({
                                 "title": title,
@@ -362,10 +362,10 @@ def _parse_papers_page(html_content: str, target_date: str) -> list[dict]:
                 for entry in props["dailyPapers"]:
                     # The structure might be nested under 'paper' key or flat depending on the API version
                     paper_data = entry.get("paper", entry)
-                    
+
                     arxiv_id = paper_data.get("id")
                     title = paper_data.get("title")
-                    
+
                     if arxiv_id and title:
                         papers.append({
                             "title": title,
@@ -502,12 +502,12 @@ def get_huggingface_papers_tool(
                 result_parts.append(f"\n**ArXiv ID:** {paper['arxiv_id']}")
             if paper.get("url"):
                 result_parts.append(f"\n**URL:** {paper['url']}")
-            
+
             # Add upvotes and comments
             upvotes = paper.get("upvotes", 0)
             comments = paper.get("num_comments", 0)
             result_parts.append(f"\n**Upvotes:** {upvotes} | **Comments:** {comments}")
-            
+
             result_parts.append("\n")  # Add extra newline separator
 
         return "\n".join(result_parts)

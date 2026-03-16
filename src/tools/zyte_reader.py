@@ -105,7 +105,7 @@ def _sort_articles_by_date(articles: list) -> list:
             return ""
         # Try datePublished first, fallback to datePublishedRaw
         return article.get("datePublished") or article.get("datePublishedRaw") or ""
-    
+
     return sorted(articles, key=get_date_key, reverse=True)
 
 
@@ -314,7 +314,7 @@ def get_zyte_article_list_tool(url: str) -> str:
 
         article_list_data = result["articleList"]
         articles = _extract_articles_from_response(article_list_data)
-        
+
         return format_article_list_as_markdown(articles)
 
     except ValueError as e:

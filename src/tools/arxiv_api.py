@@ -9,7 +9,7 @@ API Documentation: https://info.arxiv.org/help/api/user-manual.html
 
 import re
 import xml.etree.ElementTree as ET
-from typing import Literal, Optional
+from typing import Literal
 
 import requests
 from langchain_core.tools import tool

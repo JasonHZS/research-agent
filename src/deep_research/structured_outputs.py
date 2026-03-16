@@ -13,7 +13,6 @@ from typing import Literal
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ==============================================================================
 # 澄清工具
 # ==============================================================================

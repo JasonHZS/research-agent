@@ -19,7 +19,6 @@ import json
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-
 # =============================================================================
 # State Container
 # =============================================================================

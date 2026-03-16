@@ -7,7 +7,6 @@ Deep Research Display Utilities
 
 from typing import Optional
 
-
 # 不需要截断的关键参数
 FULL_DISPLAY_KEYS = {"description", "query", "prompt"}
 
