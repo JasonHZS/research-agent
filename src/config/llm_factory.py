@@ -52,6 +52,27 @@ OPENROUTER_MODELS = {
 DEFAULT_OPENROUTER_MODEL = "openai/gpt-5"
 
 
+def is_openrouter_model(model_name: Optional[str]) -> bool:
+    """Return True for supported OpenRouter aliases and fully qualified model names."""
+    if not model_name:
+        return False
+    return model_name in OPENROUTER_MODELS or model_name in OPENROUTER_MODELS.values()
+
+
+def resolve_provider_for_model(model_name: Optional[str], requested_provider: str) -> str:
+    """
+    当指定模型不在当前 provider 的模型列表中时，返回支持该模型的 provider。
+    例如：minimax-m2.5 仅支持 OpenRouter，若用户用 aliyun 指定该模型会报 404，
+    此处返回 openrouter 供调用方切换。
+    """
+    if not model_name:
+        return requested_provider
+    if requested_provider == "aliyun" and model_name not in ALIYUN_MODELS:
+        if is_openrouter_model(model_name):
+            return "openrouter"
+    return requested_provider
+
+
 def create_llm(
     model_provider: str = "aliyun",
     model_name: Optional[str] = None,
@@ -78,6 +99,9 @@ def create_llm(
             UserWarning,
             stacklevel=2,
         )
+
+    # 当指定模型不在当前 provider 支持列表时，自动切换到支持该模型的 provider
+    model_provider = resolve_provider_for_model(model_name, model_provider)
 
     if model_provider == "aliyun":
         base_url = os.getenv(

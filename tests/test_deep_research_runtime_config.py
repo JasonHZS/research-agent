@@ -3,6 +3,8 @@
 import asyncio
 from types import SimpleNamespace
 
+from src.config.llm_factory import resolve_provider_for_model
+from src.config.settings import resolve_llm_settings
 from src.deep_research.config import parse_deep_research_config
 from src.deep_research.nodes import researcher as researcher_node
 from src.deep_research.state import Section
@@ -56,6 +58,21 @@ def test_parse_deep_research_config_prefers_new_keys(monkeypatch):
 
     assert parsed.max_tool_calls == 5
     assert parsed.max_iterations == 3
+
+
+def test_resolve_provider_for_openrouter_full_model_name():
+    assert resolve_provider_for_model("openai/gpt-5", "aliyun") == "openrouter"
+
+
+def test_resolve_llm_settings_auto_switches_for_openrouter_full_model_name():
+    settings = resolve_llm_settings(
+        provider_override="aliyun",
+        model_name_override="openai/gpt-5",
+        env={},
+    )
+
+    assert settings.provider == "openrouter"
+    assert settings.model_name == "openai/gpt-5"
 
 
 def test_compress_and_output_node_uses_runtime_config(monkeypatch):

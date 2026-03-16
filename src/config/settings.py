@@ -7,9 +7,12 @@ both CLI and API layers.
 from __future__ import annotations
 
 import os
+import warnings
 from dataclasses import dataclass
 from enum import Enum
 from typing import Mapping, Optional
+
+from src.config.llm_factory import resolve_provider_for_model
 
 # LLM env names and defaults
 ENV_MODEL_PROVIDER = "MODEL_PROVIDER"
@@ -143,6 +146,18 @@ def resolve_llm_settings(
         raise ValueError(f"Invalid model provider '{provider}'. Valid options: {valid}")
 
     model_name = model_name_override or env.get(ENV_MODEL_NAME)
+
+    # 当指定模型不在当前 provider 支持列表时，自动切换到支持该模型的 provider
+    resolved_provider = resolve_provider_for_model(model_name, provider)
+    if resolved_provider != provider:
+        warnings.warn(
+            f"Model '{model_name}' is not available on {provider}. "
+            f"Auto-switching to {resolved_provider}. "
+            f"Ensure {resolved_provider.upper()}_API_KEY is set.",
+            UserWarning,
+            stacklevel=2,
+        )
+        provider = resolved_provider
 
     if enable_thinking_override is not None:
         enable_thinking = enable_thinking_override
