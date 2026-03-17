@@ -82,6 +82,7 @@ export interface ModelInfo {
  * Types of streaming events (transport-agnostic naming)
  */
 export type StreamEventType =
+  | 'snapshot'
   | 'token'
   | 'thinking'
   | 'tool_call_start'
@@ -114,6 +115,19 @@ export interface ResearchBrief {
 export interface StreamEvent {
   type: StreamEventType;
   data: Record<string, unknown>;
+}
+
+export interface StreamingSnapshot {
+  request_id: string;
+  content: string;
+  thinking_content: string;
+  tool_calls: ToolCall[];
+  segments: MessageSegment[];
+  progress_node: string | null;
+  is_clarification: boolean;
+  is_running: boolean;
+  error: string | null;
+  state_degraded: boolean;
 }
 
 /**

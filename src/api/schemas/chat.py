@@ -101,6 +101,7 @@ class StreamEventType(str, Enum):
     THINKING = "thinking"
     CLARIFICATION = "clarification"  # Deep Research 澄清问题
     BRIEF = "brief"  # Deep Research 研究大纲
+    SNAPSHOT = "snapshot"  # 当前流式消息快照（用于断流恢复）
     PROGRESS = "progress"  # Deep Research 进度更新（节点切换心跳）
 
 

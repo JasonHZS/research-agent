@@ -9,8 +9,29 @@ import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import { useStream } from '@/hooks/useWebSocket';
 import { useChatStore } from '@/hooks/useChat';
-import type { StreamEvent, ToolCall, ResearchBrief } from '@/lib/types';
+import { StreamRequestError } from '@/lib/stream';
+import type { StreamEvent, ToolCall, ResearchBrief, StreamingSnapshot } from '@/lib/types';
 import { generateId } from '@/lib/utils';
+
+function shouldAttemptResumeAfterSendFailure(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  if (error.name === 'AbortError') {
+    return false;
+  }
+
+  if (error instanceof StreamRequestError && error.status !== undefined) {
+    if (error.status === 409) {
+      return false;
+    }
+
+    return error.status === 408 || error.status === 429 || error.status >= 500;
+  }
+
+  return true;
+}
 
 export function ChatContainer() {
   const { getToken } = useAuth();
@@ -30,6 +51,7 @@ export function ChatContainer() {
     setClarification,
     setBrief,
     setProgressNode,
+    hydrateStreaming,
     finishStreaming,
     setError,
     loadModels,
@@ -51,6 +73,9 @@ export function ChatContainer() {
       switch (event.type) {
         case 'token':
           appendToken(event.data.content as string);
+          break;
+        case 'snapshot':
+          hydrateStreaming(event.data as unknown as StreamingSnapshot);
           break;
         case 'thinking':
           appendThinking(event.data.content as string);
@@ -87,6 +112,7 @@ export function ChatContainer() {
     },
     [
       appendToken,
+      hydrateStreaming,
       appendThinking,
       addToolCallStart,
       updateToolCallEnd,
@@ -98,7 +124,7 @@ export function ChatContainer() {
     ]
   );
 
-  const { sendMessage, stopStream, isStreaming, status } = useStream({
+  const { sendMessage, resumeStream, stopStream, isStreaming, status } = useStream({
     onMessage: handleStreamMessage,
   });
 
@@ -137,7 +163,32 @@ export function ChatContainer() {
       startStreaming(requestId);
 
       // Send message via SSE stream
-      await sendMessage(sessionId, finalMessage, currentModelProvider, currentModelName, isDeepResearch, token);
+      try {
+        await sendMessage(
+          sessionId,
+          finalMessage,
+          requestId,
+          currentModelProvider,
+          currentModelName,
+          isDeepResearch,
+          token,
+        );
+      } catch (error) {
+        if (!shouldAttemptResumeAfterSendFailure(error)) {
+          const message = error instanceof Error ? error.message : 'Stream request failed';
+          setError(message);
+          return;
+        }
+
+        try {
+          // Brief delay before resume to allow transient network issues to settle
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await resumeStream(sessionId, token);
+        } catch (resumeError) {
+          const message = resumeError instanceof Error ? resumeError.message : 'Stream resume failed';
+          setError(message);
+        }
+      }
     },
     [
       sessionId,
@@ -148,6 +199,7 @@ export function ChatContainer() {
       addUserMessage,
       startStreaming,
       sendMessage,
+      resumeStream,
       setError,
       clearDroppedFeedCard,
       getToken,

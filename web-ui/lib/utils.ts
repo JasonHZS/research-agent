@@ -3,6 +3,19 @@ import { twMerge } from 'tailwind-merge';
 
 const SESSION_ID_KEY = 'research_agent_session_id';
 
+export interface StreamRecoveryConfig {
+  maxResumeAttempts: number;
+  baseRetryDelayMs: number;
+  backoffMultiplier: number;
+  maxRetryDelayMs: number;
+}
+
+function parseNumberEnv(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 /**
  * Merge class names with Tailwind CSS support
  */
@@ -97,4 +110,25 @@ export function resetSessionId(): string {
   sessionStorage.setItem(SESSION_ID_KEY, newSessionId);
 
   return newSessionId;
+}
+
+export function getStreamRecoveryConfig(): StreamRecoveryConfig {
+  return {
+    maxResumeAttempts: Math.max(
+      0,
+      Math.floor(parseNumberEnv(process.env.NEXT_PUBLIC_STREAM_RESUME_MAX_ATTEMPTS, 3))
+    ),
+    baseRetryDelayMs: Math.max(
+      0,
+      Math.floor(parseNumberEnv(process.env.NEXT_PUBLIC_STREAM_RESUME_BASE_DELAY_MS, 1000))
+    ),
+    backoffMultiplier: Math.max(
+      1,
+      parseNumberEnv(process.env.NEXT_PUBLIC_STREAM_RESUME_BACKOFF_MULTIPLIER, 2)
+    ),
+    maxRetryDelayMs: Math.max(
+      0,
+      Math.floor(parseNumberEnv(process.env.NEXT_PUBLIC_STREAM_RESUME_MAX_DELAY_MS, 5000))
+    ),
+  };
 }

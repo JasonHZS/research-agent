@@ -218,6 +218,44 @@ npm exec tsc --noEmit
 
 - Deep Research 触发澄清时，前端应显示 Clarify 问题，而不是长时间停留在 `Generating response...`
 
+### 第八步：前端恢复改成可配置的多次自动重试（已完成）
+
+**问题**：此前前端恢复路径只有一次 `resumeStream()` 调用。虽然已经能恢复断流，但策略是写死的，无法根据部署环境调整，也不利于区分“值得继续重试”和“没必要重试”的错误。
+
+**措施**：
+
+- 在 `web-ui/hooks/useWebSocket.ts` 中，把恢复逻辑改成带退避的多次自动重试
+- 在 `web-ui/lib/stream.ts` 中保留 HTTP 状态码，供恢复层判断是否值得继续重试
+- 在 `web-ui/lib/utils.ts` 中新增恢复配置读取：
+  - `NEXT_PUBLIC_STREAM_RESUME_MAX_ATTEMPTS`
+  - `NEXT_PUBLIC_STREAM_RESUME_BASE_DELAY_MS`
+  - `NEXT_PUBLIC_STREAM_RESUME_BACKOFF_MULTIPLIER`
+  - `NEXT_PUBLIC_STREAM_RESUME_MAX_DELAY_MS`
+- 在 `web-ui/.env.local.example` 中补充以上变量示例
+
+**默认策略**：
+
+- 最多尝试 3 次恢复请求
+- 延迟按 `1000ms -> 2000ms -> 4000ms` 增长
+- 单次退避延迟上限 `5000ms`
+
+**可重试错误**：
+
+- 网络异常
+- `408`
+- `429`
+- `5xx`
+
+**不重试错误**：
+
+- 用户主动停止导致的 `AbortError`
+- `404`
+- `409`
+
+**额外修复**：
+
+- 如果用户在退避等待窗口里点击停止，恢复循环会立刻取消，不再继续下一次自动重试
+
 **节点标签映射**：
 
 | 节点名 | 显示文字 |
@@ -246,6 +284,7 @@ npm exec tsc --noEmit
 | 流协议重构为标准 SSE | ✅ 已完成 |
 | 路由层 SSE comment heartbeat | ✅ 已完成 |
 | 前后端协议不匹配排查 | ✅ 已完成 |
+| 前端可配置多次自动重试 | ✅ 已完成 |
 
 ---
 
@@ -253,5 +292,4 @@ npm exec tsc --noEmit
 
 - [ ] 为前端 parser 增加独立单元测试（当前已完成 TypeScript 编译校验）
 - [ ] 普通模式下如果 LLM 推理时间过长（>30s），评估是否也补充更明确的应用层进度提示
-- [ ] 前端断连自动重试机制
 - [ ] 监控 SSE 连接存活时长，收集断连统计数据

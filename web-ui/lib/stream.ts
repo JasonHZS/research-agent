@@ -4,13 +4,24 @@
  * Authorization headers, but the payload framing is standard SSE.
  */
 
-import type { StreamEvent, ToolCall, ResearchBrief } from './types';
+import type { StreamEvent, ToolCall, ResearchBrief, StreamingSnapshot } from './types';
 import { getApiBaseUrl } from './utils';
+
+export class StreamRequestError extends Error {
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'StreamRequestError';
+    this.status = status;
+  }
+}
 
 /**
  * Configuration for stream event handlers
  */
 export interface StreamConfig {
+  onSnapshot?: (snapshot: StreamingSnapshot) => void;
   onToken: (content: string) => void;
   onThinking: (content: string) => void;
   onToolCallStart: (toolCall: ToolCall) => void;
@@ -27,6 +38,9 @@ export interface StreamConfig {
  */
 function handleStreamEvent(event: StreamEvent, config: StreamConfig): void {
   switch (event.type) {
+    case 'snapshot':
+      config.onSnapshot?.(event.data as unknown as StreamingSnapshot);
+      break;
     case 'token':
       config.onToken((event.data.content as string) || '');
       break;
@@ -124,40 +138,19 @@ function parseSseFrame(frame: string): StreamEvent | null {
  * @param config - Event handlers for stream events
  * @param signal - Optional AbortSignal for cancellation
  */
-export async function streamChat(
-  sessionId: string,
-  message: string,
-  modelProvider: string,
-  modelName: string,
-  isDeepResearch: boolean,
+async function openSseStream(
+  input: RequestInfo | URL,
+  init: RequestInit,
   config: StreamConfig,
-  signal?: AbortSignal,
-  token?: string | null
 ): Promise<void> {
-  const headers: Record<string, string> = {
-    'Accept': 'text/event-stream',
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${getApiBaseUrl()}/api/chat/stream`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      session_id: sessionId,
-      message,
-      model_provider: modelProvider,
-      model_name: modelName,
-      is_deep_research: isDeepResearch,
-    }),
-    signal,
-  });
+  const response = await fetch(input, init);
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`HTTP ${response.status}: ${errorText}`);
+    throw new StreamRequestError(
+      `HTTP ${response.status}: ${errorText}`,
+      response.status,
+    );
   }
 
   if (!response.body) {
@@ -187,12 +180,10 @@ export async function streamChat(
         break;
       }
 
-      // Decode chunk and add to buffer
       buffer += decoder.decode(value, { stream: true });
 
-      // Process complete SSE frames (blank line delimited).
       const frames = buffer.split(/\r?\n\r?\n/);
-      buffer = frames.pop() || ''; // Keep incomplete frame in buffer
+      buffer = frames.pop() || '';
 
       for (const frame of frames) {
         const trimmedFrame = frame.trim();
@@ -211,4 +202,66 @@ export async function streamChat(
   } finally {
     reader.releaseLock();
   }
+}
+
+export async function streamChat(
+  sessionId: string,
+  message: string,
+  requestId: string,
+  modelProvider: string,
+  modelName: string,
+  isDeepResearch: boolean,
+  config: StreamConfig,
+  signal?: AbortSignal,
+  token?: string | null
+): Promise<void> {
+  const headers: Record<string, string> = {
+    'Accept': 'text/event-stream',
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  await openSseStream(
+    `${getApiBaseUrl()}/api/chat/stream`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        session_id: sessionId,
+        message,
+        request_id: requestId,
+        model_provider: modelProvider,
+        model_name: modelName,
+        is_deep_research: isDeepResearch,
+      }),
+      signal,
+    },
+    config,
+  );
+}
+
+export async function resumeChatStream(
+  sessionId: string,
+  config: StreamConfig,
+  signal?: AbortSignal,
+  token?: string | null,
+): Promise<void> {
+  const headers: Record<string, string> = {
+    'Accept': 'text/event-stream',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  await openSseStream(
+    `${getApiBaseUrl()}/api/chat/stream/${encodeURIComponent(sessionId)}`,
+    {
+      method: 'GET',
+      headers,
+      signal,
+    },
+    config,
+  );
 }

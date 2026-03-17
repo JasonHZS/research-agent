@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { api } from '@/lib/api';
-import type { ChatMessage, ModelInfo, ToolCall, MessageSegment, ResearchBrief, FeedDigestItem } from '@/lib/types';
+import type { ChatMessage, ModelInfo, ToolCall, MessageSegment, ResearchBrief, FeedDigestItem, StreamingSnapshot } from '@/lib/types';
 import { generateId, getStoredSessionId, resetSessionId } from '@/lib/utils';
 
 /**
@@ -77,6 +77,7 @@ interface ChatState {
   setBrief: (brief: ResearchBrief) => void;
   /** Set current progress node (Deep Research mode) */
   setProgressNode: (node: string | null) => void;
+  hydrateStreaming: (snapshot: StreamingSnapshot) => void;
   finishStreaming: (options?: { isClarification?: boolean }) => void;
   setError: (error: string | null) => void;
   clearMessages: () => void;
@@ -106,9 +107,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const existingSessionId = getStoredSessionId();
     if (existingSessionId) {
-      void api.resetSession(existingSessionId, token).catch((error) => {
-        console.warn('Failed to reset session:', error);
+      set({
+        sessionId: existingSessionId,
+        currentMessages: [],
+        streamingMessage: null,
+        error: null,
       });
+      return;
     }
 
     const sessionId = resetSessionId();
@@ -390,6 +395,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Set progress node (Deep Research heartbeat)
   setProgressNode: (node: string | null) => {
     set({ progressNode: node });
+  },
+
+  hydrateStreaming: (snapshot: StreamingSnapshot) => {
+    set({
+      progressNode: snapshot.progress_node,
+      streamingMessage: {
+        id: snapshot.request_id,
+        role: 'assistant',
+        content: snapshot.content,
+        toolCalls: snapshot.tool_calls,
+        segments: snapshot.segments ?? [],
+        isStreaming: snapshot.is_running,
+        thinkingContent: snapshot.thinking_content || undefined,
+        isClarification: snapshot.is_clarification || undefined,
+      },
+      error: snapshot.error,
+    });
   },
 
   // Finish streaming and add message to conversation

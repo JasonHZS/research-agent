@@ -4,8 +4,10 @@ import asyncio
 import json
 import time
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass, field
 from contextlib import suppress
 from typing import Any, Optional
+from uuid import uuid4
 
 import httpcore
 import httpx
@@ -34,11 +36,60 @@ from src.utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+@dataclass
+class StreamingSnapshot:
+    request_id: str
+    _content_parts: list[str] = field(default_factory=list)
+    _thinking_parts: list[str] = field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    segments: list[dict[str, Any]] = field(default_factory=list)
+    progress_node: Optional[str] = None
+    is_clarification: bool = False
+    is_running: bool = True
+    error: Optional[str] = None
+    state_degraded: bool = False
+
+    @property
+    def content(self) -> str:
+        return "".join(self._content_parts)
+
+    @content.setter
+    def content(self, value: str) -> None:
+        self._content_parts = [value]
+
+    def append_content(self, chunk: str) -> None:
+        self._content_parts.append(chunk)
+
+    @property
+    def thinking_content(self) -> str:
+        return "".join(self._thinking_parts)
+
+    @thinking_content.setter
+    def thinking_content(self, value: str) -> None:
+        self._thinking_parts = [value]
+
+    def append_thinking(self, chunk: str) -> None:
+        self._thinking_parts.append(chunk)
+
+
+@dataclass
+class BackgroundRun:
+    conversation_id: str
+    request_id: str
+    is_deep_research: bool
+    task: Optional[asyncio.Task]
+    snapshot: StreamingSnapshot
+    subscribers: set[asyncio.Queue] = field(default_factory=set)
+    terminal_event: Optional[StreamEvent] = None
+    completed_at: Optional[float] = None
+
+
 class AgentService:
     """Service for managing research agent instances and streaming."""
 
     DEEP_RESEARCH_HEARTBEAT_INTERVAL_SECONDS = 15.0
     DEEP_RESEARCH_HEARTBEAT_FALLBACK_NODE = "working"
+    COMPLETED_RUN_TTL_SECONDS = 30 * 60  # 30 minutes
 
     def __init__(self):
         """Initialize the agent service."""
@@ -46,6 +97,7 @@ class AgentService:
         self._checkpointers: dict[tuple[str, bool], MemorySaver] = {}
         self._stores: dict[tuple[str, bool], InMemoryStore] = {}
         self._agent_configs: dict[str, tuple[str, Optional[str], bool]] = {}
+        self._background_runs: dict[str, BackgroundRun] = {}
 
     def _get_or_create_agent(
         self,
@@ -142,6 +194,10 @@ class AgentService:
 
     def remove_agent(self, conversation_id: str) -> None:
         """Remove agent instance for a conversation."""
+        background_run = self._background_runs.pop(conversation_id, None)
+        if background_run is not None and background_run.task is not None:
+            background_run.task.cancel()
+
         self._agents.pop(conversation_id, None)
         for mode in (False, True):
             self._checkpointers.pop((conversation_id, mode), None)
@@ -292,7 +348,383 @@ class AgentService:
 
         return all_messages
 
+    @staticmethod
+    def _append_text_segment(
+        segments: list[dict[str, Any]],
+        content: str,
+    ) -> list[dict[str, Any]]:
+        if not content:
+            return segments
+
+        updated_segments = [dict(segment) for segment in segments]
+        if not updated_segments or updated_segments[-1].get("type") == "tool_calls":
+            updated_segments.append({"type": "text", "content": content})
+            return updated_segments
+
+        last_segment = dict(updated_segments[-1])
+        last_segment["content"] = f"{last_segment.get('content', '')}{content}"
+        updated_segments[-1] = last_segment
+        return updated_segments
+
+    @staticmethod
+    def _set_text_segment(
+        segments: list[dict[str, Any]],
+        content: str,
+    ) -> list[dict[str, Any]]:
+        updated_segments = [dict(segment) for segment in segments]
+        if not updated_segments:
+            return [{"type": "text", "content": content}]
+
+        last_segment = updated_segments[-1]
+        if last_segment.get("type") == "text":
+            updated_segments[-1] = {"type": "text", "content": content}
+        else:
+            updated_segments.append({"type": "text", "content": content})
+        return updated_segments
+
+    @staticmethod
+    def _append_tool_call_segment(
+        segments: list[dict[str, Any]],
+        tool_call: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        updated_segments = [dict(segment) for segment in segments]
+        if updated_segments and updated_segments[-1].get("type") == "tool_calls":
+            last_segment = dict(updated_segments[-1])
+            existing_tool_calls = [
+                dict(existing_tool_call)
+                for existing_tool_call in last_segment.get("toolCalls", [])
+            ]
+            if all(tc.get("status") == "running" for tc in existing_tool_calls):
+                existing_tool_calls.append(dict(tool_call))
+                last_segment["toolCalls"] = existing_tool_calls
+                updated_segments[-1] = last_segment
+                return updated_segments
+
+        updated_segments.append({"type": "tool_calls", "toolCalls": [dict(tool_call)]})
+        return updated_segments
+
+    @staticmethod
+    def _replace_tool_call(
+        tool_calls: list[dict[str, Any]],
+        tool_call: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        return [
+            dict(tool_call) if existing_tool_call.get("id") == tool_call.get("id")
+            else dict(existing_tool_call)
+            for existing_tool_call in tool_calls
+        ]
+
+    @classmethod
+    def _replace_tool_call_in_segments(
+        cls,
+        segments: list[dict[str, Any]],
+        tool_call: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        updated_segments: list[dict[str, Any]] = []
+        for segment in segments:
+            updated_segment = dict(segment)
+            if updated_segment.get("type") == "tool_calls":
+                updated_segment["toolCalls"] = cls._replace_tool_call(
+                    updated_segment.get("toolCalls", []),
+                    tool_call,
+                )
+            updated_segments.append(updated_segment)
+        return updated_segments
+
+    @classmethod
+    def _apply_event_to_snapshot(
+        cls,
+        snapshot: StreamingSnapshot,
+        event: StreamEvent,
+    ) -> None:
+        if event.type == StreamEventType.TOKEN:
+            content = str(event.data.get("content", ""))
+            snapshot.append_content(content)
+            snapshot.segments = cls._append_text_segment(snapshot.segments, content)
+        elif event.type == StreamEventType.THINKING:
+            snapshot.append_thinking(str(event.data.get("content", "")))
+        elif event.type == StreamEventType.TOOL_CALL_START:
+            tool_call = dict(event.data)
+            snapshot.tool_calls.append(tool_call)
+            snapshot.segments = cls._append_tool_call_segment(snapshot.segments, tool_call)
+        elif event.type == StreamEventType.TOOL_CALL_END:
+            tool_call = dict(event.data)
+            snapshot.tool_calls = cls._replace_tool_call(snapshot.tool_calls, tool_call)
+            snapshot.segments = cls._replace_tool_call_in_segments(snapshot.segments, tool_call)
+        elif event.type == StreamEventType.CLARIFICATION:
+            question = str(event.data.get("question", ""))
+            snapshot.content = question
+            snapshot.segments = cls._set_text_segment(snapshot.segments, question)
+            snapshot.is_clarification = True
+        elif event.type == StreamEventType.BRIEF:
+            sections = event.data.get("sections", [])
+            sections_text = "\n\n".join(
+                f"### {index + 1}. {section.get('title', '')}\n\n{section.get('description', '')}"
+                for index, section in enumerate(sections)
+            )
+            brief_content = f"## 研究大纲\n\n{sections_text}" if sections_text else "## 研究大纲"
+            if snapshot.content:
+                snapshot.content = f"{snapshot.content}\n\n{brief_content}"
+            else:
+                snapshot.content = brief_content
+            snapshot.segments = cls._append_text_segment(snapshot.segments, f"\n\n{brief_content}" if snapshot.segments else brief_content)
+        elif event.type == StreamEventType.PROGRESS:
+            node = event.data.get("node")
+            snapshot.progress_node = str(node) if node else None
+        elif event.type == StreamEventType.MESSAGE_COMPLETE:
+            snapshot.is_running = False
+            snapshot.is_clarification = bool(
+                event.data.get("is_clarification", snapshot.is_clarification)
+            )
+        elif event.type == StreamEventType.ERROR:
+            snapshot.is_running = False
+            snapshot.error = str(event.data.get("message", "Unknown error"))
+
+    def _build_snapshot_from_state(
+        self,
+        conversation_id: str,
+        run: BackgroundRun,
+    ) -> dict[str, Any]:
+        snapshot = StreamingSnapshot(
+            request_id=run.snapshot.request_id,
+            tool_calls=[dict(tool_call) for tool_call in run.snapshot.tool_calls],
+            segments=[dict(segment) for segment in run.snapshot.segments],
+            progress_node=run.snapshot.progress_node,
+            is_clarification=run.snapshot.is_clarification,
+            is_running=run.snapshot.is_running,
+            error=run.snapshot.error,
+        )
+        snapshot.content = run.snapshot.content
+        snapshot.thinking_content = run.snapshot.thinking_content
+
+        agent = self._agents.get(conversation_id)
+        if agent is not None:
+            try:
+                state = agent.get_state({"configurable": {"thread_id": conversation_id}})
+                if state and state.values:
+                    values = state.values
+                    final_report = values.get("final_report", "")
+                    clarification_status = values.get("clarification_status")
+                    research_brief = values.get("research_brief")
+                    sections = values.get("sections")
+
+                    if hasattr(clarification_status, "value"):
+                        clarification_status = clarification_status.value
+                    if hasattr(research_brief, "value"):
+                        research_brief = research_brief.value
+                    if hasattr(sections, "value"):
+                        sections = sections.value
+
+                    if final_report and not snapshot.content:
+                        snapshot.content = str(final_report)
+                        snapshot.segments = [{"type": "text", "content": snapshot.content}]
+
+                    if isinstance(clarification_status, ClarificationStatus):
+                        snapshot.is_clarification = clarification_status.need_clarification
+                        if clarification_status.question:
+                            snapshot.content = clarification_status.question
+                            snapshot.segments = [{"type": "text", "content": snapshot.content}]
+                    elif isinstance(clarification_status, dict):
+                        snapshot.is_clarification = bool(
+                            clarification_status.get("need_clarification", snapshot.is_clarification)
+                        )
+                        question = clarification_status.get("question", "")
+                        if question:
+                            snapshot.content = question
+                            snapshot.segments = [{"type": "text", "content": snapshot.content}]
+
+                    if research_brief and sections and "## 研究大纲" not in snapshot.content:
+                        sections_text = "\n\n".join(
+                            f"### {index + 1}. {section.title if isinstance(section, Section) else section.get('title', '')}\n\n"
+                            f"{section.description if isinstance(section, Section) else section.get('description', '')}"
+                            for index, section in enumerate(sections)
+                        )
+                        brief_content = f"## 研究大纲\n\n{sections_text}" if sections_text else "## 研究大纲"
+                        snapshot.content = (
+                            f"{snapshot.content}\n\n{brief_content}"
+                            if snapshot.content
+                            else brief_content
+                        )
+                        snapshot.segments = [{"type": "text", "content": snapshot.content}]
+            except Exception as state_error:
+                logger.warning(
+                    "Could not build snapshot from graph state",
+                    conversation_id=conversation_id,
+                    error=str(state_error),
+                )
+                snapshot.state_degraded = True
+
+        return {
+            "request_id": snapshot.request_id,
+            "content": snapshot.content,
+            "thinking_content": snapshot.thinking_content,
+            "tool_calls": snapshot.tool_calls,
+            "segments": snapshot.segments,
+            "progress_node": snapshot.progress_node,
+            "is_clarification": snapshot.is_clarification,
+            "is_running": snapshot.is_running,
+            "error": snapshot.error,
+            "state_degraded": snapshot.state_degraded,
+        }
+
+    async def _broadcast_to_subscribers(
+        self,
+        run: BackgroundRun,
+        event: Optional[StreamEvent],
+    ) -> None:
+        stale_subscribers: list[asyncio.Queue] = []
+        for subscriber in run.subscribers:
+            try:
+                subscriber.put_nowait(event)
+            except asyncio.QueueFull:
+                stale_subscribers.append(subscriber)
+
+        for stale_subscriber in stale_subscribers:
+            run.subscribers.discard(stale_subscriber)
+
+    async def _run_in_background(
+        self,
+        run: BackgroundRun,
+        message: str,
+        model_provider: Optional[str],
+        model_name: Optional[str],
+    ) -> None:
+        try:
+            async for event in self._stream_agent_events(
+                conversation_id=run.conversation_id,
+                message=message,
+                model_provider=model_provider,
+                model_name=model_name,
+                is_deep_research=run.is_deep_research,
+            ):
+                self._apply_event_to_snapshot(run.snapshot, event)
+                if event.type in {StreamEventType.MESSAGE_COMPLETE, StreamEventType.ERROR}:
+                    run.terminal_event = event
+                await self._broadcast_to_subscribers(run, event)
+        except asyncio.CancelledError:
+            run.snapshot.error = "Run was cancelled"
+            raise
+        except Exception as run_error:
+            logger.exception(
+                "Background run failed unexpectedly",
+                conversation_id=run.conversation_id,
+                error=str(run_error),
+            )
+            error_event = StreamEvent(
+                type=StreamEventType.ERROR,
+                data={"message": str(run_error)},
+            )
+            self._apply_event_to_snapshot(run.snapshot, error_event)
+            run.terminal_event = error_event
+            await self._broadcast_to_subscribers(run, error_event)
+        finally:
+            run.snapshot.is_running = False
+            run.completed_at = time.monotonic()
+            await self._broadcast_to_subscribers(run, None)
+
+    def _purge_stale_runs(self) -> None:
+        """Remove completed BackgroundRun objects older than TTL."""
+        now = time.monotonic()
+        stale_ids = [
+            cid
+            for cid, run in self._background_runs.items()
+            if run.completed_at is not None
+            and (now - run.completed_at) > self.COMPLETED_RUN_TTL_SECONDS
+        ]
+        for cid in stale_ids:
+            self._background_runs.pop(cid, None)
+
+    def _get_background_run(self, conversation_id: str) -> Optional[BackgroundRun]:
+        """Return the current run after enforcing TTL for completed entries."""
+        self._purge_stale_runs()
+        return self._background_runs.get(conversation_id)
+
+    def start_background_run(
+        self,
+        conversation_id: str,
+        message: str,
+        model_provider: Optional[str] = None,
+        model_name: Optional[str] = None,
+        is_deep_research: bool = False,
+        request_id: Optional[str] = None,
+    ) -> BackgroundRun:
+        existing_run = self._get_background_run(conversation_id)
+        if existing_run is not None and existing_run.task is not None and not existing_run.task.done():
+            raise ValueError(f"Conversation {conversation_id} already has an active run")
+
+        resolved_request_id = request_id or uuid4().hex
+        snapshot = StreamingSnapshot(request_id=resolved_request_id)
+        run = BackgroundRun(
+            conversation_id=conversation_id,
+            request_id=resolved_request_id,
+            is_deep_research=is_deep_research,
+            task=None,
+            snapshot=snapshot,
+        )
+        run.task = asyncio.create_task(
+            self._run_in_background(
+                run=run,
+                message=message,
+                model_provider=model_provider,
+                model_name=model_name,
+            )
+        )
+        self._background_runs[conversation_id] = run
+        return run
+
+    async def subscribe_to_run(
+        self,
+        conversation_id: str,
+    ) -> AsyncGenerator[StreamEvent, None]:
+        run = self._get_background_run(conversation_id)
+        if run is None:
+            raise ValueError(f"No background run found for conversation {conversation_id}")
+
+        queue: asyncio.Queue = asyncio.Queue()
+        if run.snapshot.is_running:
+            run.subscribers.add(queue)
+
+        try:
+            yield StreamEvent(
+                type=StreamEventType.SNAPSHOT,
+                data=self._build_snapshot_from_state(conversation_id, run),
+            )
+
+            if not run.snapshot.is_running:
+                if run.terminal_event is not None:
+                    yield run.terminal_event
+                return
+
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield event
+        finally:
+            run.subscribers.discard(queue)
+
+    def has_background_run(self, conversation_id: str) -> bool:
+        return self._get_background_run(conversation_id) is not None
+
     async def stream_response(
+        self,
+        conversation_id: str,
+        message: str,
+        model_provider: Optional[str] = None,
+        model_name: Optional[str] = None,
+        is_deep_research: bool = False,
+    ) -> AsyncGenerator[StreamEvent, None]:
+        """Backward-compatible direct event stream for tests and non-background use."""
+        async for event in self._stream_agent_events(
+            conversation_id=conversation_id,
+            message=message,
+            model_provider=model_provider,
+            model_name=model_name,
+            is_deep_research=is_deep_research,
+        ):
+            yield event
+
+    async def _stream_agent_events(
         self,
         conversation_id: str,
         message: str,

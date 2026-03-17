@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { streamChat, type StreamConfig } from '@/lib/stream';
-import type { StreamEvent, StreamingStatus, ToolCall } from '@/lib/types';
+import { StreamRequestError, resumeChatStream, streamChat, type StreamConfig } from '@/lib/stream';
+import type { StreamEvent, StreamingStatus } from '@/lib/types';
+import { getStreamRecoveryConfig } from '@/lib/utils';
 
 export type { StreamingStatus };
 
@@ -28,6 +29,103 @@ export function useStream(options: UseStreamOptions = {}) {
   const callbacksRef = useRef({ onMessage, onError });
   callbacksRef.current = { onMessage, onError };
 
+  const sleep = useCallback((delayMs: number, signal: AbortSignal) => {
+    return new Promise<void>((resolve, reject) => {
+      const createAbortError = () => {
+        const error = new Error('The operation was aborted');
+        error.name = 'AbortError';
+        return error;
+      };
+
+      if (signal.aborted) {
+        reject(createAbortError());
+        return;
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, delayMs);
+
+      const onAbort = () => {
+        window.clearTimeout(timeoutId);
+        signal.removeEventListener('abort', onAbort);
+        reject(createAbortError());
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+  }, []);
+
+  const isRetryableResumeError = useCallback((error: unknown): boolean => {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    if (error.name === 'AbortError') {
+      return false;
+    }
+
+    if (error instanceof StreamRequestError && error.status !== undefined) {
+      if (error.status === 404 || error.status === 409) {
+        return false;
+      }
+
+      return error.status === 408 || error.status === 429 || error.status >= 500;
+    }
+
+    return true;
+  }, []);
+
+  const createStreamConfig = useCallback((): StreamConfig => ({
+    onSnapshot: (snapshot) => {
+      callbacksRef.current.onMessage?.({
+        type: 'snapshot',
+        data: snapshot as unknown as Record<string, unknown>,
+      });
+    },
+    onToken: (content) => {
+      callbacksRef.current.onMessage?.({ type: 'token', data: { content } });
+    },
+    onThinking: (content) => {
+      callbacksRef.current.onMessage?.({ type: 'thinking', data: { content } });
+    },
+    onToolCallStart: (toolCall) => {
+      callbacksRef.current.onMessage?.({
+        type: 'tool_call_start',
+        data: toolCall as unknown as Record<string, unknown>,
+      });
+    },
+    onToolCallEnd: (toolCall) => {
+      callbacksRef.current.onMessage?.({
+        type: 'tool_call_end',
+        data: toolCall as unknown as Record<string, unknown>,
+      });
+    },
+    onClarification: (question) => {
+      callbacksRef.current.onMessage?.({ type: 'clarification', data: { question } });
+    },
+    onBrief: (brief) => {
+      callbacksRef.current.onMessage?.({ type: 'brief', data: brief as unknown as Record<string, unknown> });
+    },
+    onProgress: (node) => {
+      callbacksRef.current.onMessage?.({ type: 'progress', data: { node } });
+    },
+    onComplete: (data) => {
+      callbacksRef.current.onMessage?.({
+        type: 'message_complete',
+        data: { is_clarification: data?.is_clarification },
+      });
+      setStatus('idle');
+    },
+    onError: (errorMsg) => {
+      setError(errorMsg);
+      setStatus('error');
+      callbacksRef.current.onError?.(errorMsg);
+      callbacksRef.current.onMessage?.({ type: 'error', data: { message: errorMsg } });
+    },
+  }), []);
+
   /**
    * Send a message and stream the response
    */
@@ -35,6 +133,7 @@ export function useStream(options: UseStreamOptions = {}) {
     async (
       sessionId: string,
       message: string,
+      requestId: string,
       modelProvider: string,
       modelName: string,
       isDeepResearch: boolean,
@@ -49,58 +148,15 @@ export function useStream(options: UseStreamOptions = {}) {
       setStatus('streaming');
       setError(null);
 
-      // Create stream config that bridges to the options callbacks
-      const config: StreamConfig = {
-        onToken: (content) => {
-          callbacksRef.current.onMessage?.({ type: 'token', data: { content } });
-        },
-        onThinking: (content) => {
-          callbacksRef.current.onMessage?.({ type: 'thinking', data: { content } });
-        },
-        onToolCallStart: (toolCall) => {
-          callbacksRef.current.onMessage?.({
-            type: 'tool_call_start',
-            data: toolCall as unknown as Record<string, unknown>,
-          });
-        },
-        onToolCallEnd: (toolCall) => {
-          callbacksRef.current.onMessage?.({
-            type: 'tool_call_end',
-            data: toolCall as unknown as Record<string, unknown>,
-          });
-        },
-        onClarification: (question) => {
-          callbacksRef.current.onMessage?.({ type: 'clarification', data: { question } });
-        },
-        onBrief: (brief) => {
-          callbacksRef.current.onMessage?.({ type: 'brief', data: brief as unknown as Record<string, unknown> });
-        },
-        onProgress: (node) => {
-          callbacksRef.current.onMessage?.({ type: 'progress', data: { node } });
-        },
-        onComplete: (data) => {
-          callbacksRef.current.onMessage?.({ 
-            type: 'message_complete', 
-            data: { is_clarification: data?.is_clarification } 
-          });
-          setStatus('idle');
-        },
-        onError: (errorMsg) => {
-          setError(errorMsg);
-          setStatus('error');
-          callbacksRef.current.onError?.(errorMsg);
-          callbacksRef.current.onMessage?.({ type: 'error', data: { message: errorMsg } });
-        },
-      };
-
       try {
         await streamChat(
           sessionId,
           message,
+          requestId,
           modelProvider,
           modelName,
           isDeepResearch,
-          config,
+          createStreamConfig(),
           abortControllerRef.current.signal,
           token
         );
@@ -115,9 +171,83 @@ export function useStream(options: UseStreamOptions = {}) {
         setError(errorMsg);
         setStatus('error');
         callbacksRef.current.onError?.(errorMsg);
+        throw e;
       }
     },
-    []
+    [createStreamConfig]
+  );
+
+  const resumeStream = useCallback(
+    async (
+      sessionId: string,
+      token?: string | null
+    ): Promise<void> => {
+      const recoveryConfig = getStreamRecoveryConfig();
+      if (recoveryConfig.maxResumeAttempts <= 0) {
+        const error = new Error('Automatic stream resume is disabled');
+        setError(error.message);
+        setStatus('error');
+        callbacksRef.current.onError?.(error.message);
+        throw error;
+      }
+
+      let attempt = 0;
+      let currentDelayMs = recoveryConfig.baseRetryDelayMs;
+
+      while (attempt < recoveryConfig.maxResumeAttempts) {
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = new AbortController();
+
+        setStatus('streaming');
+        setError(null);
+
+        try {
+          await resumeChatStream(
+            sessionId,
+            createStreamConfig(),
+            abortControllerRef.current.signal,
+            token,
+          );
+          return;
+        } catch (e) {
+          if (e instanceof Error && e.name === 'AbortError') {
+            setStatus('idle');
+            return;
+          }
+
+          attempt += 1;
+          const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+
+          if (
+            attempt >= recoveryConfig.maxResumeAttempts ||
+            !isRetryableResumeError(e)
+          ) {
+            setError(errorMsg);
+            setStatus('error');
+            callbacksRef.current.onError?.(errorMsg);
+            throw e;
+          }
+
+          try {
+            await sleep(currentDelayMs, abortControllerRef.current.signal);
+          } catch (sleepError) {
+            if (sleepError instanceof Error && sleepError.name === 'AbortError') {
+              setStatus('idle');
+              return;
+            }
+            throw sleepError;
+          }
+          currentDelayMs = Math.min(
+            recoveryConfig.maxRetryDelayMs,
+            Math.max(
+              recoveryConfig.baseRetryDelayMs,
+              Math.round(currentDelayMs * recoveryConfig.backoffMultiplier)
+            )
+          );
+        }
+      }
+    },
+    [createStreamConfig, isRetryableResumeError, sleep]
   );
 
   /**
@@ -133,6 +263,7 @@ export function useStream(options: UseStreamOptions = {}) {
     status,
     error,
     sendMessage,
+    resumeStream,
     stopStream,
     isStreaming: status === 'streaming',
   };
