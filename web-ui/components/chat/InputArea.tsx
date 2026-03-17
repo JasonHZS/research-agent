@@ -188,8 +188,7 @@ export function InputArea({
                   )}
                   title={isDeepResearch ? "Deep Research Mode On" : "Enable Deep Research Mode"}
                 >
-                  <span className="hidden sm:inline">Deep Research</span>
-                  <span className="sm:hidden">Deep</span>
+                  Deep Research
                 </Button>
               )}
             </div>

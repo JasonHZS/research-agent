@@ -166,7 +166,7 @@
 }
 
 .markdown-content table {
-  @apply w-full min-w-[280px] border-collapse my-4;
+  @apply w-full border-collapse;
 }
 
 .markdown-content th,

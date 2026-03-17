@@ -77,7 +77,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ content, attachedFee
           </p>
         </a>
       )}
-      <div className="rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 bg-primary text-primary-foreground rounded-br-md break-words max-w-[min(80vw,100%)]">
+      <div className="rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 bg-primary text-primary-foreground rounded-br-md break-words max-w-[min(85vw,100%)] [overflow-wrap:anywhere]">
         <p className="whitespace-pre-wrap text-sm sm:text-base">{content}</p>
       </div>
       {/* Copy button - always visible on mobile (touch), hover on desktop */}

@@ -42,7 +42,7 @@ export default function RootLayout({
           <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         </head>
         <body className={inter.className}>
-          <div className="flex h-dvh min-h-screen overflow-hidden bg-background safe-area-inset">
+          <div className="flex h-dvh overflow-hidden bg-background safe-area-inset">
             {children}
           </div>
         </body>
