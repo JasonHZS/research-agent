@@ -89,7 +89,8 @@ export type StreamEventType =
   | 'message_complete'
   | 'error'
   | 'clarification'  // Deep Research 澄清问题
-  | 'brief';  // Deep Research 研究大纲
+  | 'brief'  // Deep Research 研究大纲
+  | 'progress';  // Deep Research 进度心跳
 
 /**
  * Section plan in research brief

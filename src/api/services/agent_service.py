@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 from collections.abc import AsyncGenerator
+from contextlib import suppress
 from typing import Any, Optional
 
 import httpcore
@@ -35,6 +36,9 @@ logger = get_logger(__name__)
 
 class AgentService:
     """Service for managing research agent instances and streaming."""
+
+    DEEP_RESEARCH_HEARTBEAT_INTERVAL_SECONDS = 15.0
+    DEEP_RESEARCH_HEARTBEAT_FALLBACK_NODE = "working"
 
     def __init__(self):
         """Initialize the agent service."""
@@ -351,10 +355,27 @@ class AgentService:
         # For Deep Research: track clarification status and brief from state updates
         clarification_sent = False
         brief_sent = False
+        _last_progress_node = ""  # Track the latest known graph node for heartbeat payloads
+        _last_heartbeat_time = 0.0  # Track when the last progress event was emitted
 
         extra_config = None
         max_concurrency = None
         completed_tool_ids: set[str] = set()
+        stream = None
+        stream_iter = None
+        pending_chunk_task: asyncio.Task | None = None
+
+        def emit_progress_if_changed(node_name: str) -> StreamEvent | None:
+            nonlocal _last_progress_node, _last_heartbeat_time
+            if not node_name or node_name == _last_progress_node:
+                return None
+
+            _last_progress_node = node_name
+            _last_heartbeat_time = time.monotonic()
+            return StreamEvent(
+                type=StreamEventType.PROGRESS,
+                data={"node": node_name},
+            )
 
         try:
             # For Deep Research: enable verbose mode to print tool calls in backend
@@ -368,13 +389,46 @@ class AgentService:
                 }
                 max_concurrency = runtime_settings.deep_research.max_concurrent
 
-            async for mode, chunk in run_research_stream(
+            stream = run_research_stream(
                 query=message,
                 agent=agent,
                 thread_id=conversation_id,
                 extra_config=extra_config,
                 max_concurrency=max_concurrency,
-            ):
+            )
+            stream_iter = stream.__aiter__()
+            pending_chunk_task = asyncio.create_task(anext(stream_iter))
+
+            while True:
+                if is_deep_research:
+                    # Keep the upstream iterator alive while we inject keepalive
+                    # events. wait_for() would cancel the pending __anext__ call
+                    # on every timeout, which breaks long-running stages.
+                    done, _ = await asyncio.wait(
+                        {pending_chunk_task},
+                        timeout=self.DEEP_RESEARCH_HEARTBEAT_INTERVAL_SECONDS,
+                    )
+                    if not done:
+                        _last_heartbeat_time = time.monotonic()
+                        yield StreamEvent(
+                            type=StreamEventType.PROGRESS,
+                            data={
+                                "node": (
+                                    _last_progress_node
+                                    or self.DEEP_RESEARCH_HEARTBEAT_FALLBACK_NODE
+                                )
+                            },
+                        )
+                        continue
+
+                try:
+                    mode, chunk = await pending_chunk_task
+                except StopAsyncIteration:
+                    pending_chunk_task = None
+                    break
+
+                pending_chunk_task = asyncio.create_task(anext(stream_iter))
+
                 if mode == "messages":
                     # Token streaming - only forward AI messages to avoid leaking tool output
                     message_chunk, metadata = chunk
@@ -392,6 +446,9 @@ class AgentService:
                     # - aggregate: utility node with debug logs
                     if is_deep_research:
                         current_node = metadata.get("langgraph_node", "")
+                        progress_event = emit_progress_if_changed(current_node)
+                        if progress_event is not None:
+                            yield progress_event
                         allowed_text_nodes = {"final_report"}
                         if current_node not in allowed_text_nodes:
                             continue
@@ -424,6 +481,10 @@ class AgentService:
                     for node_name, node_data in chunk.items():
                         if node_data is None:
                             continue
+                        if is_deep_research:
+                            progress_event = emit_progress_if_changed(node_name)
+                            if progress_event is not None:
+                                yield progress_event
                         tool_calls_log = node_data.get("tool_calls_log") if isinstance(node_data, dict) else None
                         if hasattr(tool_calls_log, "value"):
                             tool_calls_log = tool_calls_log.value
@@ -844,6 +905,14 @@ class AgentService:
                 type=StreamEventType.ERROR,
                 data={"message": str(e)},
             )
+        finally:
+            if pending_chunk_task is not None and not pending_chunk_task.done():
+                pending_chunk_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await pending_chunk_task
+            if stream is not None and hasattr(stream, "aclose"):
+                with suppress(Exception):
+                    await stream.aclose()
 
     def get_available_models(self) -> list[ModelInfo]:
         """Get list of available models."""

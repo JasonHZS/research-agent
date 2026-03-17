@@ -8,6 +8,23 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import { ToolCallPanel } from './ToolCallPanel';
 import type { ChatMessage, ToolCall, MessageSegment, FeedDigestItem } from '@/lib/types';
 
+/** Map Deep Research graph node names to user-friendly labels */
+const PROGRESS_NODE_LABELS: Record<string, string> = {
+  working: '正在处理中...',
+  clarify: '正在理解问题...',
+  analyze: '正在分析需求...',
+  plan_sections: '正在规划研究大纲...',
+  discover: '正在搜索资料...',
+  discover_tools: '正在搜索资料...',
+  researcher: '正在深入研究...',
+  researcher_tools: '正在深入研究...',
+  extract_output: '正在提取内容...',
+  compress_output: '正在整理内容...',
+  aggregate: '正在汇总结果...',
+  review: '正在审阅报告...',
+  final_report: '正在撰写报告...',
+};
+
 interface MessageBubbleProps {
   message: ChatMessage;
   isStreaming?: boolean;
@@ -257,6 +274,8 @@ interface StreamingMessageBubbleProps {
   /** Segments for interleaved display */
   segments?: MessageSegment[];
   thinkingContent?: string;
+  /** Current progress node (Deep Research mode) */
+  progressNode?: string | null;
 }
 
 export const StreamingMessageBubble = memo(function StreamingMessageBubble({
@@ -264,6 +283,7 @@ export const StreamingMessageBubble = memo(function StreamingMessageBubble({
   toolCalls,
   segments = [],
   thinkingContent,
+  progressNode,
 }: StreamingMessageBubbleProps) {
   // Use segments if available, otherwise fall back to legacy rendering
   const hasSegments = segments.length > 0;
@@ -281,6 +301,14 @@ export const StreamingMessageBubble = memo(function StreamingMessageBubble({
             <p className="whitespace-pre-wrap text-xs opacity-70 line-clamp-3">
               {thinkingContent}
             </p>
+          </div>
+        )}
+
+        {/* Deep Research progress indicator — shown alongside content */}
+        {progressNode && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
+            <span>{PROGRESS_NODE_LABELS[progressNode] ?? progressNode}</span>
           </div>
         )}
 

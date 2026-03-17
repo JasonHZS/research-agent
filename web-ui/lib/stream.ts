@@ -1,6 +1,7 @@
 /**
- * SSE Stream connection using Fetch + ReadableStream
- * Provides a simple interface for streaming chat responses
+ * SSE stream connection using Fetch + ReadableStream.
+ * We keep fetch instead of EventSource because this endpoint uses POST and
+ * Authorization headers, but the payload framing is standard SSE.
  */
 
 import type { StreamEvent, ToolCall, ResearchBrief } from './types';
@@ -16,6 +17,7 @@ export interface StreamConfig {
   onToolCallEnd: (toolCall: ToolCall) => void;
   onClarification?: (question: string) => void;
   onBrief?: (brief: ResearchBrief) => void;
+  onProgress?: (node: string) => void;
   onComplete: (data?: { is_clarification?: boolean }) => void;
   onError: (error: string) => void;
 }
@@ -45,6 +47,10 @@ function handleStreamEvent(event: StreamEvent, config: StreamConfig): void {
       // Deep Research: research brief
       config.onBrief?.(event.data as unknown as ResearchBrief);
       break;
+    case 'progress':
+      // Deep Research: node progress heartbeat
+      config.onProgress?.((event.data.node as string) || '');
+      break;
     case 'message_complete':
       config.onComplete({ is_clarification: event.data.is_clarification as boolean | undefined });
       break;
@@ -52,6 +58,60 @@ function handleStreamEvent(event: StreamEvent, config: StreamConfig): void {
       config.onError((event.data.message as string) || 'Unknown error');
       break;
   }
+}
+
+/**
+ * Parse a single SSE frame into a transport-agnostic StreamEvent.
+ * Comment-only frames return null and should be ignored by the caller.
+ */
+function parseSseFrame(frame: string): StreamEvent | null {
+  const lines = frame.split(/\r?\n/);
+  let eventType: string | null = null;
+  const dataLines: string[] = [];
+
+  for (const line of lines) {
+    if (!line) {
+      continue;
+    }
+
+    if (line.startsWith(':')) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf(':');
+    const field = separatorIndex >= 0 ? line.slice(0, separatorIndex) : line;
+    let value = separatorIndex >= 0 ? line.slice(separatorIndex + 1) : '';
+    if (value.startsWith(' ')) {
+      value = value.slice(1);
+    }
+
+    switch (field) {
+      case 'event':
+        eventType = value;
+        break;
+      case 'data':
+        dataLines.push(value);
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (!eventType) {
+    return null;
+  }
+
+  const rawData = dataLines.join('\n');
+  let data: Record<string, unknown> = {};
+
+  if (rawData) {
+    data = JSON.parse(rawData) as Record<string, unknown>;
+  }
+
+  return {
+    type: eventType as StreamEvent['type'],
+    data,
+  };
 }
 
 /**
@@ -75,6 +135,7 @@ export async function streamChat(
   token?: string | null
 ): Promise<void> {
   const headers: Record<string, string> = {
+    'Accept': 'text/event-stream',
     'Content-Type': 'application/json',
   };
   if (token) {
@@ -112,13 +173,15 @@ export async function streamChat(
       const { done, value } = await reader.read();
 
       if (done) {
-        // Process any remaining data in buffer
-        if (buffer.trim()) {
+        const finalFrame = buffer.trim();
+        if (finalFrame) {
           try {
-            const event = JSON.parse(buffer.trim()) as StreamEvent;
-            handleStreamEvent(event, config);
+            const event = parseSseFrame(finalFrame);
+            if (event) {
+              handleStreamEvent(event, config);
+            }
           } catch {
-            console.warn('Failed to parse final buffer:', buffer);
+            console.warn('Failed to parse final SSE frame:', finalFrame);
           }
         }
         break;
@@ -127,17 +190,20 @@ export async function streamChat(
       // Decode chunk and add to buffer
       buffer += decoder.decode(value, { stream: true });
 
-      // Process complete NDJSON lines
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+      // Process complete SSE frames (blank line delimited).
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() || ''; // Keep incomplete frame in buffer
 
-      for (const line of lines) {
-        if (line.trim()) {
+      for (const frame of frames) {
+        const trimmedFrame = frame.trim();
+        if (trimmedFrame) {
           try {
-            const event = JSON.parse(line) as StreamEvent;
-            handleStreamEvent(event, config);
+            const event = parseSseFrame(trimmedFrame);
+            if (event) {
+              handleStreamEvent(event, config);
+            }
           } catch (e) {
-            console.error('Failed to parse stream event:', line, e);
+            console.error('Failed to parse SSE frame:', trimmedFrame, e);
           }
         }
       }

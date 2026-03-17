@@ -29,6 +29,7 @@ export function ChatContainer() {
     updateToolCallEnd,
     setClarification,
     setBrief,
+    setProgressNode,
     finishStreaming,
     setError,
     loadModels,
@@ -68,6 +69,10 @@ export function ChatContainer() {
           // Deep Research: set research brief
           setBrief(event.data as unknown as ResearchBrief);
           break;
+        case 'progress':
+          // Deep Research: node progress heartbeat
+          setProgressNode(event.data.node as string);
+          break;
         case 'message_complete':
           // Pass isClarification flag from server
           finishStreaming({ 
@@ -87,6 +92,7 @@ export function ChatContainer() {
       updateToolCallEnd,
       setClarification,
       setBrief,
+      setProgressNode,
       finishStreaming,
       setError,
     ]
@@ -245,7 +251,7 @@ export function ChatContainer() {
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">Start Your Research</h2>
                 <p className="text-muted-foreground max-w-md">
-                  Ask me about AI research, recent papers, tech trends, or anything else you'd like to explore.
+                  Ask me about AI research, recent papers, tech trends, or anything else you&apos;d like to explore.
                 </p>
               </div>
             </div>

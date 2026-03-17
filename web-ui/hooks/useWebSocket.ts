@@ -75,6 +75,9 @@ export function useStream(options: UseStreamOptions = {}) {
         onBrief: (brief) => {
           callbacksRef.current.onMessage?.({ type: 'brief', data: brief as unknown as Record<string, unknown> });
         },
+        onProgress: (node) => {
+          callbacksRef.current.onMessage?.({ type: 'progress', data: { node } });
+        },
         onComplete: (data) => {
           callbacksRef.current.onMessage?.({ 
             type: 'message_complete', 

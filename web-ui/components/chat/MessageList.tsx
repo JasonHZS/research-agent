@@ -13,7 +13,7 @@ interface MessageListProps {
 }
 
 export function MessageList({ className }: MessageListProps) {
-  const { currentMessages, streamingMessage } = useChatStore();
+  const { currentMessages, streamingMessage, progressNode } = useChatStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -71,7 +71,14 @@ export function MessageList({ className }: MessageListProps) {
     if (autoScrollEnabled && scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [currentMessages, streamingMessage?.content, streamingMessage?.thinkingContent, streamingMessage?.segments, autoScrollEnabled]);
+  }, [
+    currentMessages,
+    streamingMessage?.content,
+    streamingMessage?.thinkingContent,
+    streamingMessage?.segments,
+    progressNode,
+    autoScrollEnabled,
+  ]);
 
   const hasMessages = currentMessages.length > 0 || streamingMessage;
 
@@ -103,6 +110,7 @@ export function MessageList({ className }: MessageListProps) {
                 toolCalls={streamingMessage.toolCalls}
                 segments={streamingMessage.segments}
                 thinkingContent={streamingMessage.thinkingContent}
+                progressNode={progressNode}
               />
             )}
 

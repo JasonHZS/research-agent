@@ -104,6 +104,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
         strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
         // Add image styling
         img: ({ src, alt, ...props }) => (
+          // eslint-disable-next-line @next/next/no-img-element -- Markdown may contain arbitrary remote images.
           <img
             src={src}
             alt={alt}

@@ -41,6 +41,8 @@ interface ChatState {
 
   // Streaming state
   streamingMessage: StreamingMessage | null;
+  /** Current Deep Research progress node (for heartbeat display) */
+  progressNode: string | null;
 
   // UI state
   isLoading: boolean;
@@ -73,6 +75,8 @@ interface ChatState {
   setClarification: (question: string) => void;
   /** Set research brief (Deep Research mode) */
   setBrief: (brief: ResearchBrief) => void;
+  /** Set current progress node (Deep Research mode) */
+  setProgressNode: (node: string | null) => void;
   finishStreaming: (options?: { isClarification?: boolean }) => void;
   setError: (error: string | null) => void;
   clearMessages: () => void;
@@ -88,6 +92,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isDeepResearch: false,
   canToggleDeepResearch: true,
   streamingMessage: null,
+  progressNode: null,
   isLoading: false,
   error: null,
   droppedFeedCard: null,
@@ -191,6 +196,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Start streaming a new assistant message
   startStreaming: (requestId: string) => {
     set({
+      progressNode: null,
       streamingMessage: {
         id: requestId,
         role: 'assistant',
@@ -381,6 +387,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  // Set progress node (Deep Research heartbeat)
+  setProgressNode: (node: string | null) => {
+    set({ progressNode: node });
+  },
+
   // Finish streaming and add message to conversation
   finishStreaming: (options?: { isClarification?: boolean }) => {
     const { streamingMessage, currentMessages } = get();
@@ -400,6 +411,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({
         currentMessages: [...currentMessages, finalMessage],
         streamingMessage: null,
+        progressNode: null,
       });
     }
   },
