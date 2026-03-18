@@ -176,21 +176,25 @@ This project provides a Web UI and backend API service, allowing you to use the 
 The backend uses FastAPI and provides RESTful API and streaming support.
 
 ```bash
-# Start with uvicorn (development mode with hot reload)
-ENV=development uv run uvicorn src.api.main:app --reload --port 8111
+# Start with uvicorn (development mode with hot reload, port 8112)
+ENV=development uv run uvicorn src.api.main:app --reload --port 8112
 
-# Or use Python module approach
+# Or use Python module approach (auto-selects port 8112 when ENV=development)
 ENV=development uv run python -m src.api.main
-
-# Use LangGraph CLI (recommended, supports LangGraph Studio)
-langgraph dev
 ```
 
-The API service runs on `http://localhost:8111` by default. You can configure it via environment variables:
+The API service port depends on the environment:
+
+| Environment | Default Port |
+|-------------|-------------|
+| Development | 8112 |
+| Production  | 8111 |
+
+You can override via environment variables:
 
 ```bash
 API_HOST=0.0.0.0  # Default 0.0.0.0
-API_PORT=8111     # Default 8111
+API_PORT=8112     # Explicit override (takes priority over ENV-based default)
 ```
 
 ### Production Deployment
@@ -200,11 +204,11 @@ For production environments, it is recommended to use `uv run` to ensure environ
 ```bash
 # Start with uvicorn (production mode)
 # Logs will be written to logs/app.log in the project root (auto-created if not exists)
-ENV=production uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8111
+ENV=production uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8111  # Production uses 8111
 
 # Custom log path (optional)
 ENV=production LOG_FILE=/path/to/your/app.log \
-  uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8111
+  uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8111  # Production uses 8111
 ```
 
 
@@ -227,7 +231,7 @@ npm run build && cp -r .next/static .next/standalone/.next/static
 npm run start:prod
 ```
 
-The frontend development server runs on `http://localhost:3000` by default.
+The frontend development server runs on `http://localhost:3001` by default (production uses port 3000).
 
 **Important**: The frontend needs to connect to the backend API, so make sure the backend service is running first.
 

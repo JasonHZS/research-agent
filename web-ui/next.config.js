@@ -8,10 +8,13 @@ const nextConfig = {
 
   // API proxy configuration for development
   async rewrites() {
+    const defaultApiPort =
+      process.env.NODE_ENV === 'development' ? '8112' : '8111';
+    const apiPort = process.env.NEXT_PUBLIC_API_PORT || defaultApiPort;
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8111/api/:path*',
+        destination: `http://localhost:${apiPort}/api/:path*`,
       },
     ];
   },

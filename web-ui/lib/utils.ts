@@ -66,8 +66,11 @@ export function generateId(): string {
 export function getApiBaseUrl(): string {
   if (typeof window === 'undefined') return '';
 
-  // Development: use backend port 8111
-  if (process.env.NODE_ENV === 'development') return 'http://localhost:8111';
+  // Development: use configurable backend port (default 8112)
+  if (process.env.NODE_ENV === 'development') {
+    const port = process.env.NEXT_PUBLIC_API_PORT || '8112';
+    return `http://localhost:${port}`;
+  }
 
   // Production: use explicit API URL if configured (recommended for SSE stability),
   // otherwise fall back to same origin (goes through Next.js rewrite proxy)

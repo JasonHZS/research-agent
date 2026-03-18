@@ -17,6 +17,8 @@ HN_API_BASE = "https://hacker-news.firebaseio.com/v0"
 TIMEOUT = httpx.Timeout(connect=10.0, read=15.0, write=5.0, pool=10.0)
 DEFAULT_LIMIT = 10
 MAX_LIMIT = 30
+MAX_RETRIES = 3
+RETRY_BACKOFF_SECONDS = 0.5
 
 
 class HNToolError(ToolException):
@@ -31,14 +33,37 @@ def _raise_hn_tool_error(action: str, exc: Exception) -> None:
     raise HNToolError(f"Hacker News API request failed while {action}: {exc}") from exc
 
 
+def _is_retryable_http_error(exc: Exception) -> bool:
+    """Return True for transient transport failures worth retrying."""
+    return isinstance(
+        exc,
+        (
+            httpx.ConnectError,
+            httpx.ReadTimeout,
+            httpx.WriteTimeout,
+            httpx.PoolTimeout,
+            httpx.RemoteProtocolError,
+        ),
+    )
+
+
 async def _fetch_json(client: httpx.AsyncClient, path: str, action: str) -> Any:
     """Fetch and decode JSON from the HN Firebase API."""
-    try:
-        response = await client.get(f"{HN_API_BASE}/{path}.json")
-        response.raise_for_status()
-        return response.json()
-    except (httpx.HTTPError, ValueError) as exc:
-        _raise_hn_tool_error(action, exc)
+    last_exc: Exception | None = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = await client.get(f"{HN_API_BASE}/{path}.json")
+            response.raise_for_status()
+            return response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            last_exc = exc
+            if not _is_retryable_http_error(exc) or attempt == MAX_RETRIES:
+                _raise_hn_tool_error(action, exc)
+            await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+
+    if last_exc is not None:
+        _raise_hn_tool_error(action, last_exc)
+    raise HNToolError(f"Hacker News API request failed while {action}: unknown error")
 
 
 async def _fetch_item(client: httpx.AsyncClient, item_id: int) -> dict[str, Any] | None:
@@ -59,8 +84,25 @@ async def _fetch_items_batch(item_ids: list[int], limit: int) -> list[dict[str, 
     ids = item_ids[:capped]
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         tasks = [_fetch_item(client, item_id) for item_id in ids]
-        results = await asyncio.gather(*tasks)
-    return [r for r in results if r is not None]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    items: list[dict[str, Any]] = []
+    errors: list[Exception] = []
+    for result in results:
+        if isinstance(result, Exception):
+            errors.append(result)
+            continue
+        if result is not None:
+            items.append(result)
+
+    if items:
+        return items
+    if errors:
+        first_error = errors[0]
+        if isinstance(first_error, HNToolError):
+            raise first_error
+        _raise_hn_tool_error("fetching Hacker News items", first_error)
+    return []
 
 
 async def _fetch_story_ids(endpoint: str) -> list[int]:

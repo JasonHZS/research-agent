@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from src.tools import hacker_news as hn
 from src.tools.hacker_news import (
     HNToolError,
+    _fetch_items_batch,
     _fetch_item,
     _fetch_story_ids,
     get_hn_top_stories,
@@ -232,6 +233,22 @@ class TestStoryFetchers:
 
 class TestFetchHelpers:
     @pytest.mark.asyncio
+    async def test_fetch_item_retries_transient_transport_failure(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = MOCK_STORY
+        mock_resp.raise_for_status = MagicMock()
+
+        client = MagicMock()
+        client.get = AsyncMock(
+            side_effect=[hn.httpx.ConnectError("proxy down"), mock_resp]
+        )
+
+        result = await _fetch_item(client, 12345)
+
+        assert result == MOCK_STORY
+        assert client.get.await_count == 2
+
+    @pytest.mark.asyncio
     async def test_fetch_item_returns_none_for_null_payload(self):
         mock_resp = MagicMock()
         mock_resp.json.return_value = None
@@ -260,6 +277,38 @@ class TestFetchHelpers:
 
             with pytest.raises(HNToolError, match="fetching topstories"):
                 await _fetch_story_ids("topstories")
+
+    @pytest.mark.asyncio
+    async def test_fetch_items_batch_returns_partial_results_when_some_items_fail(self):
+        with patch(f"{_P}.httpx.AsyncClient") as mock_cls, patch(
+            f"{_P}._fetch_item",
+            new_callable=AsyncMock,
+        ) as mock_fetch_item:
+            mock_cls.return_value.__aenter__.return_value = MagicMock()
+            mock_fetch_item.side_effect = [
+                MOCK_STORY,
+                HNToolError("Hacker News API request failed while fetching item 2: timeout"),
+                None,
+            ]
+
+            result = await _fetch_items_batch([1, 2, 3], 3)
+
+        assert result == [MOCK_STORY]
+
+    @pytest.mark.asyncio
+    async def test_fetch_items_batch_raises_when_all_items_fail(self):
+        with patch(f"{_P}.httpx.AsyncClient") as mock_cls, patch(
+            f"{_P}._fetch_item",
+            new_callable=AsyncMock,
+        ) as mock_fetch_item:
+            mock_cls.return_value.__aenter__.return_value = MagicMock()
+            mock_fetch_item.side_effect = [
+                HNToolError("Hacker News API request failed while fetching item 1: timeout"),
+                HNToolError("Hacker News API request failed while fetching item 2: timeout"),
+            ]
+
+            with pytest.raises(HNToolError, match="fetching item 1"):
+                await _fetch_items_batch([1, 2], 2)
 
 
 # ---------------------------------------------------------------------------

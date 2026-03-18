@@ -45,6 +45,9 @@ ENV_API_PORT = "API_PORT"
 DEFAULT_API_HOST = "0.0.0.0"
 DEFAULT_API_PORT = 8111
 
+# Development defaults (used when ENV=development)
+DEFAULT_DEV_API_PORT = 8112
+
 # Feed digest security env names and defaults
 ENV_FEEDS_ADMIN_TOKEN = "FEEDS_ADMIN_TOKEN"
 ENV_FEEDS_FORCE_REFRESH_RATE_LIMIT = "FEEDS_FORCE_REFRESH_RATE_LIMIT"
@@ -61,6 +64,8 @@ ENV_CLERK_AUTHORIZED_PARTIES = "CLERK_AUTHORIZED_PARTIES"
 DEFAULT_CLERK_AUTHORIZED_PARTIES = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
     "http://localhost:5173",
 ]
 
@@ -234,10 +239,15 @@ def resolve_deep_research_settings(
 
 def resolve_api_settings(env: Mapping[str, str] = os.environ) -> APISettings:
     host = env.get(ENV_API_HOST, DEFAULT_API_HOST)
+
+    # Use dev port (8112) when ENV=development and no explicit API_PORT override
+    is_dev = env.get("ENV", "").lower() == "development"
+    default_port = DEFAULT_DEV_API_PORT if is_dev else DEFAULT_API_PORT
+
     try:
-        port = int(env.get(ENV_API_PORT, str(DEFAULT_API_PORT)))
+        port = int(env.get(ENV_API_PORT, str(default_port)))
     except ValueError:
-        port = DEFAULT_API_PORT
+        port = default_port
 
     return APISettings(host=host, port=port)
 
