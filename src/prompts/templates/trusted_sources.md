@@ -6,13 +6,10 @@
 
 | 名称 | URL | 说明 |
 |------|-----|------|
-| The Batch | https://www.deeplearning.ai/the-batch/ | 吴恩达博客文章，AI 领域趋势洞察 |
-| Andrej Karpathy 博客 | https://karpathy.bearblog.dev/blog/ | 前 Tesla AI 总监，OpenAI 联合创始人 |
+| The Batch | https://www.deeplearning.ai/the-batch/ | 吴恩达博客文章,AI 领域趋势洞察。**技术说明**:该站为 Next.js SSR/CSR 混合架构,文章列表通过客户端 JS 渲染。`get_zyte_article_list_tool` 已自动启用 `browserHtml` 模式(无头浏览器渲染完整 DOM),无需手动指定参数。 |
+| Andrej Karpathy 博客 | https://karpathy.bearblog.dev/blog/ | 前 Tesla AI 总监,OpenAI 联合创始人 |
 | colah's blog | https://colah.github.io/ | 神经网络可视化与直觉解释 |
-| Ziming Liu's Blog | https://kindxiaoming.github.io/blog/ | KAN 作者，Physics-of-AI 系列研究 |
-
-
-> **The Batch 特殊说明**：`get_zyte_article_list_tool` 无法解析 The Batch 的文章列表页。The Batch 最新每一期的url格式为：`https://www.deeplearning.ai/the-batch/issue-{最新期号}/`（当前最新为 issue-333，日期为2025-12-26）。
+| Ziming Liu's Blog | https://kindxiaoming.github.io/blog/ | KAN 作者,Physics-of-AI 系列研究 |
 
 ### AI 公司官方博客
 

@@ -9,9 +9,27 @@ API Documentation: https://docs.zyte.com/zyte-api/usage/reference.html
 
 import os
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 from langchain_core.tools import tool
+
+# Sites that require browser rendering (Next.js SSR/CSR, SPA, etc.)
+# httpResponseBody returns incomplete DOM for these; browserHtml uses
+# a headless browser to render the full page before extraction.
+_BROWSER_RENDER_DOMAINS: set[str] = {
+    "www.deeplearning.ai",
+    "deeplearning.ai",
+}
+
+
+def _needs_browser_render(url: str) -> bool:
+    """Check if a URL's domain is known to require browser rendering."""
+    try:
+        domain = urlparse(url).netloc.lower()
+        return domain in _BROWSER_RENDER_DOMAINS
+    except Exception:
+        return False
 
 
 def _get_zyte_api_key(api_key: Optional[str] = None) -> str:
@@ -57,13 +75,18 @@ def fetch_article_content(url: str, api_key: Optional[str] = None) -> dict:
     return response.json()
 
 
-def fetch_article_list(url: str, api_key: Optional[str] = None) -> dict:
+def fetch_article_list(
+    url: str, api_key: Optional[str] = None, use_browser: bool = False
+) -> dict:
     """
     Fetch article list from a website using Zyte API.
 
     Args:
         url: The URL of the website to fetch article list from (e.g., blog homepage).
         api_key: Zyte API key. If not provided, will try to get from environment.
+        use_browser: If True, use browserHtml rendering instead of httpResponseBody.
+            Required for Next.js / SPA / CSR sites where article links are
+            injected by JavaScript (e.g., deeplearning.ai/the-batch).
 
     Returns:
         A dictionary containing the extracted article list data.
@@ -73,16 +96,21 @@ def fetch_article_list(url: str, api_key: Optional[str] = None) -> dict:
         requests.RequestException: If the API request fails.
     """
     zyte_api_key = _get_zyte_api_key(api_key)
+    extract_from = "browserHtml" if use_browser else "httpResponseBody"
+
+    payload: dict = {
+        "url": url,
+        "articleList": True,
+        "articleListOptions": {"extractFrom": extract_from},
+    }
+    # followRedirect conflicts with browser rendering mode
+    if not use_browser:
+        payload["followRedirect"] = True
 
     response = requests.post(
         "https://api.zyte.com/v1/extract",
         auth=(zyte_api_key, ""),
-        json={
-            "url": url,
-            "articleList": True,
-            "articleListOptions": {"extractFrom": "httpResponseBody"},
-            "followRedirect": True,
-        },
+        json=payload,
         timeout=120,
     )
     response.raise_for_status()
@@ -284,7 +312,7 @@ def _extract_articles_from_response(article_list_data) -> list:
 
 
 @tool
-def get_zyte_article_list_tool(url: str) -> str:
+def get_zyte_article_list_tool(url: str, use_browser: bool = False) -> str:
     """
     Fetch recent article list from a blog or news website.
 
@@ -302,12 +330,16 @@ def get_zyte_article_list_tool(url: str) -> str:
 
     Args:
         url: The URL of the blog homepage or news listing page.
+        use_browser: Force browser rendering (slower, more expensive).
+            Auto-enabled for known Next.js/SPA sites like deeplearning.ai/the-batch.
 
     Returns:
         Markdown-formatted list of articles with headline, URL, publish date, and preview.
     """
     try:
-        result = fetch_article_list(url)
+        # Auto-detect if browser rendering is needed
+        needs_browser = use_browser or _needs_browser_render(url)
+        result = fetch_article_list(url, use_browser=needs_browser)
 
         if "articleList" not in result:
             return f"Error: No article list found at {url}. The page may not contain a list of articles."

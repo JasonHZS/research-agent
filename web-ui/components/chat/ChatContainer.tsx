@@ -231,7 +231,7 @@ export function ChatContainer() {
   return (
     <div className="flex flex-col h-full relative">
       {/* Header - Floating on top */}
-      <header className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <h1 className="font-semibold text-lg">Research Agent</h1>
           {/* Streaming status indicator */}

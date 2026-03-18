@@ -146,14 +146,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  // Load available models
+  // Load available models (keep default selection unless not yet set)
   loadModels: async (token?: string | null) => {
     try {
       const response = await api.getModels(token);
       set({
         models: response.models,
-        currentModelProvider: response.current_provider,
-        currentModelName: response.current_model,
       });
     } catch (error) {
       console.error('Failed to load models:', error);
