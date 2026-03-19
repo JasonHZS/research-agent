@@ -53,23 +53,27 @@ describe('Home todo layout', () => {
     };
   });
 
-  it('reserves desktop space when the todo sidebar is visible', () => {
+  it('keeps desktop layout width unchanged when the todo sidebar is visible', () => {
     mockChatState.todoItems = [{ todo: 'Draft plan', status: 'pending' }];
     mockChatState.isTodoSidebarVisible = true;
 
     render(React.createElement(Home));
 
-    expect(screen.getByRole('main')).toHaveClass('md:pr-[20rem]');
+    expect(screen.getByRole('main')).not.toHaveClass('md:pr-[20rem]');
+    expect(screen.getByRole('main')).not.toHaveClass('md:pr-[18rem]');
     expect(screen.getByRole('main')).toHaveClass('pb-[48px]');
+    expect(screen.getByRole('main')).toHaveClass('safe-pb-todo-mobile');
   });
 
-  it('does not reserve desktop space when the todo sidebar is hidden', () => {
+  it('does not add todo spacing when the todo sidebar is hidden', () => {
     mockChatState.todoItems = [{ todo: 'Draft plan', status: 'pending' }];
     mockChatState.isTodoSidebarVisible = false;
 
     render(React.createElement(Home));
 
     expect(screen.getByRole('main')).not.toHaveClass('md:pr-[20rem]');
+    expect(screen.getByRole('main')).not.toHaveClass('md:pr-[18rem]');
     expect(screen.getByRole('main')).not.toHaveClass('pb-[48px]');
+    expect(screen.getByRole('main')).not.toHaveClass('safe-pb-todo-mobile');
   });
 });

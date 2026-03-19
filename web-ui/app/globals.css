@@ -100,6 +100,32 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     @apply bg-muted-foreground/30;
   }
+
+  .safe-pb-todo-mobile {
+    padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .safe-pb-mobile-inset {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-bottom-4 {
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (min-width: 768px) {
+    .safe-pb-todo-mobile {
+      padding-bottom: 0;
+    }
+
+    .safe-pb-mobile-inset {
+      padding-bottom: 0;
+    }
+
+    .safe-bottom-4 {
+      bottom: 1rem;
+    }
+  }
 }
 
 /* Markdown content styles */

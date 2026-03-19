@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { Check, Circle, Loader2, ListTodo, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, PanelBottomClose } from 'lucide-react';
+import { Check, Circle, Loader2, ListTodo, ChevronUp, ChevronDown, PanelBottomClose } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/hooks/useChat';
 import type { TodoItem } from '@/lib/types';
@@ -15,8 +15,8 @@ function TodoStatusIcon({ status }: { status: TodoItem['status'] }) {
   switch (status) {
     case 'completed':
       return (
-        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-500/15">
-          <Check className="h-3 w-3 text-green-500" />
+        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/15">
+          <Check className="h-3 w-3 text-primary" />
         </div>
       );
     case 'in_progress':
@@ -85,7 +85,7 @@ export const TodoSidebar = memo(function TodoSidebar() {
   if (!isTodoSidebarVisible) {
     return (
       <>
-        <div className="hidden md:block fixed right-4 top-16 z-20 animate-in slide-in-from-right-4 duration-300">
+        <div className="hidden md:block fixed right-4 top-[4.25rem] z-20 animate-in slide-in-from-right-4 duration-300">
           <button
             type="button"
             onClick={showTodoSidebar}
@@ -93,13 +93,13 @@ export const TodoSidebar = memo(function TodoSidebar() {
             title="展开 TODO"
             aria-label="展开 TODO"
           >
-            <ChevronLeft className="h-4 w-4 text-muted-foreground" />
             <ListTodo className="h-4 w-4 text-primary" />
             <span>TODO {completedCount}/{totalCount}</span>
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>
 
-        <div className="md:hidden fixed bottom-4 right-4 z-20 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="md:hidden fixed right-4 z-20 animate-in slide-in-from-bottom-4 duration-300 safe-bottom-4">
           <button
             type="button"
             onClick={showTodoSidebar}
@@ -117,9 +117,9 @@ export const TodoSidebar = memo(function TodoSidebar() {
 
   return (
     <>
-      {/* Desktop: fixed right sidebar */}
-      <div className="hidden md:block fixed right-4 top-16 z-20 w-72 animate-in slide-in-from-right-4 duration-300">
-        <div className="rounded-xl border border-border bg-background/95 backdrop-blur-md shadow-lg overflow-hidden">
+      {/* Desktop: floating panel below the top-right header actions */}
+      <div className="hidden md:block fixed right-4 top-[4.25rem] z-20 w-[22rem] max-w-[calc(100vw-2rem)] animate-in slide-in-from-right-4 duration-300">
+        <div className="overflow-hidden rounded-2xl border border-border bg-background/95 backdrop-blur-md shadow-xl">
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2">
               <ListTodo className="h-4 w-4 text-primary" />
@@ -134,12 +134,12 @@ export const TodoSidebar = memo(function TodoSidebar() {
               title="折叠 TODO"
               aria-label="折叠 TODO"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronUp className="h-4 w-4" />
             </button>
           </div>
           <div className="h-0.5 bg-muted">
             <div
-              className="h-full bg-green-500 transition-all duration-500 ease-out"
+              className="h-full bg-primary transition-all duration-500 ease-out"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -153,7 +153,7 @@ export const TodoSidebar = memo(function TodoSidebar() {
 
       {/* Mobile: fixed bottom bar, collapsible */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 animate-in slide-in-from-bottom-4 duration-300">
-        <div className="border-t border-border bg-background/95 backdrop-blur-md shadow-[0_-4px_12px_rgba(0,0,0,0.1)]">
+        <div className="border-t border-border bg-background/95 backdrop-blur-md shadow-[0_-4px_12px_rgba(0,0,0,0.1)] safe-pb-mobile-inset">
           {/* Header — sibling elements, no nested buttons */}
           <div className="flex items-center justify-between px-4 py-2.5">
             <div
@@ -170,7 +170,7 @@ export const TodoSidebar = memo(function TodoSidebar() {
               {/* Inline mini progress bar */}
               <div className="w-16 h-1 bg-muted rounded-full overflow-hidden shrink-0">
                 <div
-                  className="h-full bg-green-500 transition-all duration-500 ease-out rounded-full"
+                  className="h-full bg-primary transition-all duration-500 ease-out rounded-full"
                   style={{ width: `${progress}%` }}
                 />
               </div>

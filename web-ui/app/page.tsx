@@ -51,7 +51,7 @@ export default function Home() {
         <TodoSidebar />
         {/* Main Chat Area - Add mobile bottom padding when todo bar is visible */}
         <main
-          className={`flex-1 flex flex-col min-w-0 ${hasMessages ? '' : 'pb-[112px]'} ${showTodoSidebar ? 'md:pr-[20rem] md:pb-0 pb-[48px]' : ''}`}
+          className={`flex-1 flex flex-col min-w-0 ${hasMessages ? '' : 'pb-[112px]'} ${showTodoSidebar ? 'pb-[48px] md:pb-0 safe-pb-todo-mobile' : ''}`}
         >
           <ChatContainer />
         </main>
