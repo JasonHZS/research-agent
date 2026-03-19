@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { Check, Circle, Loader2, ListTodo, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { Check, Circle, Loader2, ListTodo, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, PanelBottomClose } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/hooks/useChat';
 import type { TodoItem } from '@/lib/types';
@@ -187,7 +187,7 @@ export const TodoSidebar = memo(function TodoSidebar() {
               title="隐藏 TODO"
               aria-label="隐藏 TODO"
             >
-              <X className="h-3.5 w-3.5" />
+              <PanelBottomClose className="h-3.5 w-3.5" />
             </button>
           </div>
 
