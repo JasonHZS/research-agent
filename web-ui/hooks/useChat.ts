@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { api } from '@/lib/api';
-import type { ChatMessage, ModelInfo, ToolCall, MessageSegment, ResearchBrief, FeedDigestItem, StreamingSnapshot } from '@/lib/types';
+import type { ChatMessage, ModelInfo, ToolCall, TodoItem, MessageSegment, ResearchBrief, FeedDigestItem, StreamingSnapshot } from '@/lib/types';
 import { generateId, getStoredSessionId, resetSessionId } from '@/lib/utils';
 
 /**
@@ -43,6 +43,10 @@ interface ChatState {
   streamingMessage: StreamingMessage | null;
   /** Current Deep Research progress node (for heartbeat display) */
   progressNode: string | null;
+  /** Global todo items from write_todos tool calls */
+  todoItems: TodoItem[];
+  /** Whether the todo sidebar is currently visible */
+  isTodoSidebarVisible: boolean;
 
   // UI state
   isLoading: boolean;
@@ -71,6 +75,14 @@ interface ChatState {
   appendThinking: (content: string) => void;
   addToolCallStart: (toolCall: ToolCall) => void;
   updateToolCallEnd: (toolCall: ToolCall) => void;
+  /** Update todo items from write_todos tool call */
+  setTodoItems: (items: TodoItem[]) => void;
+  /** Clear todo items (e.g., on new chat) */
+  clearTodoItems: () => void;
+  /** Hide todo sidebar while keeping todo data recoverable */
+  hideTodoSidebar: () => void;
+  /** Show todo sidebar when todo data exists */
+  showTodoSidebar: () => void;
   /** Set clarification question content (Deep Research mode) */
   setClarification: (question: string) => void;
   /** Set research brief (Deep Research mode) */
@@ -94,6 +106,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   canToggleDeepResearch: true,
   streamingMessage: null,
   progressNode: null,
+  todoItems: [],
+  isTodoSidebarVisible: false,
   isLoading: false,
   error: null,
   droppedFeedCard: null,
@@ -111,6 +125,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sessionId: existingSessionId,
         currentMessages: [],
         streamingMessage: null,
+        isTodoSidebarVisible: false,
         error: null,
       });
       return;
@@ -121,6 +136,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       sessionId,
       currentMessages: [],
       streamingMessage: null,
+      isTodoSidebarVisible: false,
       error: null,
     });
   },
@@ -140,6 +156,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       currentMessages: [],
       streamingMessage: null,
       error: null,
+      todoItems: [],
+      isTodoSidebarVisible: false,
       // Reset Deep Research state for new chat
       isDeepResearch: false,
       canToggleDeepResearch: true,
@@ -200,6 +218,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   startStreaming: (requestId: string) => {
     set({
       progressNode: null,
+      todoItems: [],
+      isTodoSidebarVisible: false,
       streamingMessage: {
         id: requestId,
         role: 'assistant',
@@ -255,42 +275,66 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Add tool call start - append chronologically
   addToolCallStart: (toolCall: ToolCall) => {
     const { streamingMessage } = get();
-    if (streamingMessage) {
-      const segments = [...streamingMessage.segments];
-      const lastSegment = segments[segments.length - 1];
+    if (!streamingMessage) return;
 
-      // Chronological append:
-      // - If last segment is tool_calls with all running status, add to it (batch)
-      // - Otherwise create a new tool_calls segment at the end
-      if (lastSegment?.type === 'tool_calls') {
-        const allRunning = lastSegment.toolCalls.every(tc => tc.status === 'running');
-        if (allRunning) {
-          // Batch with the current tool_calls segment
-          segments[segments.length - 1] = {
-            ...lastSegment,
-            toolCalls: [...lastSegment.toolCalls, toolCall],
-          };
-        } else {
-          // Previous tool calls completed, start a new segment
-          segments.push({ type: 'tool_calls', toolCalls: [toolCall] });
-        }
+    // Intercept write_todos: route to todoItems state instead of inline display
+    if (toolCall.name === 'write_todos') {
+      const todos = toolCall.args?.todos;
+      if (Array.isArray(todos)) {
+        set({
+          todoItems: todos as TodoItem[],
+          isTodoSidebarVisible: todos.length > 0,
+        });
+      }
+      return;
+    }
+
+    const segments = [...streamingMessage.segments];
+    const lastSegment = segments[segments.length - 1];
+
+    // Chronological append:
+    // - If last segment is tool_calls with all running status, add to it (batch)
+    // - Otherwise create a new tool_calls segment at the end
+    if (lastSegment?.type === 'tool_calls') {
+      const allRunning = lastSegment.toolCalls.every(tc => tc.status === 'running');
+      if (allRunning) {
+        // Batch with the current tool_calls segment
+        segments[segments.length - 1] = {
+          ...lastSegment,
+          toolCalls: [...lastSegment.toolCalls, toolCall],
+        };
       } else {
-        // Last segment is text or empty, append new tool_calls segment
+        // Previous tool calls completed, start a new segment
         segments.push({ type: 'tool_calls', toolCalls: [toolCall] });
       }
-
-      set({
-        streamingMessage: {
-          ...streamingMessage,
-          toolCalls: [...streamingMessage.toolCalls, toolCall],
-          segments,
-        },
-      });
+    } else {
+      // Last segment is text or empty, append new tool_calls segment
+      segments.push({ type: 'tool_calls', toolCalls: [toolCall] });
     }
+
+    set({
+      streamingMessage: {
+        ...streamingMessage,
+        toolCalls: [...streamingMessage.toolCalls, toolCall],
+        segments,
+      },
+    });
   },
 
   // Update tool call with result
   updateToolCallEnd: (toolCall: ToolCall) => {
+    // Intercept write_todos: update todoItems from result
+    if (toolCall.name === 'write_todos') {
+      const todos = toolCall.args?.todos;
+      if (Array.isArray(todos)) {
+        set({
+          todoItems: todos as TodoItem[],
+          isTodoSidebarVisible: todos.length > 0,
+        });
+      }
+      return;
+    }
+
     const { streamingMessage } = get();
     if (streamingMessage) {
       // Update in flat toolCalls array
@@ -319,6 +363,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       });
     }
+  },
+
+  // Set todo items directly
+  setTodoItems: (items: TodoItem[]) => {
+    set({ todoItems: items, isTodoSidebarVisible: items.length > 0 });
+  },
+
+  // Clear todo items
+  clearTodoItems: () => {
+    set({ todoItems: [], isTodoSidebarVisible: false });
+  },
+
+  hideTodoSidebar: () => {
+    set({ isTodoSidebarVisible: false });
+  },
+
+  showTodoSidebar: () => {
+    const { todoItems } = get();
+    if (todoItems.length === 0) return;
+    set({ isTodoSidebarVisible: true });
   },
 
   // Set clarification question (Deep Research mode)
@@ -396,14 +460,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   hydrateStreaming: (snapshot: StreamingSnapshot) => {
+    // Extract write_todos from snapshot tool_calls and restore to todoItems
+    const writeTodoCalls = snapshot.tool_calls.filter(tc => tc.name === 'write_todos');
+    const otherToolCalls = snapshot.tool_calls.filter(tc => tc.name !== 'write_todos');
+
+    // Restore todoItems from the last write_todos call (it's a full snapshot)
+    let restoredTodos: TodoItem[] = [];
+    if (writeTodoCalls.length > 0) {
+      const lastTodoCall = writeTodoCalls[writeTodoCalls.length - 1];
+      const todos = lastTodoCall.args?.todos;
+      if (Array.isArray(todos)) {
+        restoredTodos = todos as TodoItem[];
+      }
+    }
+
+    // Filter write_todos out of segments
+    const filteredSegments = (snapshot.segments ?? []).map(segment => {
+      if (segment.type === 'tool_calls') {
+        const filtered = segment.toolCalls.filter(tc => tc.name !== 'write_todos');
+        if (filtered.length === 0) return null;
+        return { ...segment, toolCalls: filtered };
+      }
+      return segment;
+    }).filter((s): s is NonNullable<typeof s> => s !== null);
+
     set({
       progressNode: snapshot.progress_node,
+      todoItems: restoredTodos,
+      isTodoSidebarVisible: restoredTodos.length > 0,
       streamingMessage: {
         id: snapshot.request_id,
         role: 'assistant',
         content: snapshot.content,
-        toolCalls: snapshot.tool_calls,
-        segments: snapshot.segments ?? [],
+        toolCalls: otherToolCalls,
+        segments: filteredSegments,
         isStreaming: snapshot.is_running,
         thinkingContent: snapshot.thinking_content || undefined,
         isClarification: snapshot.is_clarification || undefined,
@@ -438,7 +528,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Set error message
   setError: (error: string | null) => {
-    set({ error, streamingMessage: null });
+    set({ error, streamingMessage: null, todoItems: [], isTodoSidebarVisible: false });
   },
 
   // Clear all messages (for new chat)

@@ -9,6 +9,20 @@
 export type ToolCallStatus = 'running' | 'completed' | 'failed';
 
 /**
+ * A single todo item from the agent's write_todos tool
+ * Field names vary by LLM framework, so we keep it flexible
+ */
+export interface TodoItem {
+  todo?: string;
+  task?: string;
+  description?: string;
+  content?: string;
+  title?: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  [key: string]: unknown;
+}
+
+/**
  * Tool call information
  */
 export interface ToolCall {
