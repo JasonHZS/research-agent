@@ -147,14 +147,7 @@ export const ModelSelector = memo(function ModelSelector({
                           : 'opacity-0'
                       )}
                     />
-                    <div className="flex flex-col">
-                      <span>{itemDisplayName}</span>
-                      {model.supports_thinking && (
-                        <span className="text-xs text-muted-foreground">
-                          Supports thinking
-                        </span>
-                      )}
-                    </div>
+                    <span>{itemDisplayName}</span>
                   </DropdownMenuItem>
                 );
               })}

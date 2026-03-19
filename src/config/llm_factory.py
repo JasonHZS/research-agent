@@ -30,10 +30,12 @@ DEFAULT_TIMEOUT = httpx.Timeout(
 )
 
 # Aliyun DashScope 模型映射
+# kimi-k2.5 使用月之暗面（Moonshot AI）直供的模型推理服务，API 模型名为 kimi/kimi-k2.5
+# 参见：https://help.aliyun.com/zh/model-studio/kimi-api-by-moonshot-ai
 ALIYUN_MODELS = {
     "qwen3.5-plus": "qwen3.5-plus",
     "qwen3-max": "qwen3-max",
-    "kimi-k2.5": "kimi-k2.5",
+    "kimi-k2.5": "kimi/kimi-k2.5",
     "glm-5": "glm-5",
     # MiniMax-M2.1 暂不支持：模型在处理 Function Calling 时返回非 JSON 格式的 arguments
     # 错误: "The 'function.arguments' parameter of the code model must be in JSON format."
@@ -45,11 +47,12 @@ DEFAULT_ALIYUN_MODEL = "qwen3.5-plus"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_MODELS = {
     "claude-sonnet-4.6": "anthropic/claude-sonnet-4.6",
-    "gpt-5": "openai/gpt-5",
+    "gpt-5.2": "openai/gpt-5.2",
     "gemini-3-flash": "google/gemini-3-flash-preview",
-    "minimax-m2.5": "minimax/minimax-m2.5",
+    "minimax-m2.7": "minimax/minimax-m2.7",
+    "glm-5-turbo": "z-ai/glm-5-turbo",
 }
-DEFAULT_OPENROUTER_MODEL = "openai/gpt-5"
+DEFAULT_OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6"
 
 
 def is_openrouter_model(model_name: Optional[str]) -> bool:
