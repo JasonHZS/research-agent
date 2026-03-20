@@ -1,6 +1,8 @@
 # Research Agent
 
-A deep research agent built with LangGraph and LangChain, featuring MCP (Model Context Protocol) tools integration for comprehensive AI research capabilities.
+A deep research agent built with LangGraph, LangChain, and DeepAgents, using native HTTP/API tools (ArXiv, Hacker News, Hugging Face, Tavily, RSS, GitHub, and more) for comprehensive AI research.
+
+**Languages:** [English](README.md) · [简体中文](README.zh-CN.md)
 
 ## Features
 
@@ -8,13 +10,13 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 - **Smart Query Analysis**: Automatically identifies query types (list/comparison/deep_dive/general) and optimizes research strategy
 - **Entity Discovery**: For "list" queries (e.g., "What are the best X?"), discovers all relevant entities before deep diving
 - **ArXiv Search**: Search and retrieve academic papers using ArXiv's official API
-- **Hacker News Integration**: Get trending stories and discussions via MCP
+- **Hacker News Integration**: Trending and discussion data via the official Hacker News Firebase API (`src/tools/hacker_news.py`)
 - **Hugging Face Daily Papers**: Fetch daily featured AI/ML papers with titles and abstracts
 - **Hugging Face Blog**: Browse official and community blog posts with metadata
 - **Multi-LLM Support**: Works with Aliyun (qwen3.5-plus, qwen3-max, kimi-k2.5), Anthropic Claude, and OpenAI GPT
 - **Thinking Mode**: Optional thinking mode for supported models (qwen3.5-plus, qwen3-max, kimi-k2.5)
 - **Modular Architecture**: High cohesion, low coupling design for easy extension
-- **Clerk Authentication**: 使用 [Clerk](https://clerk.com/) 作为用户登录管理第三方服务，支持 Web UI 与 API 统一认证
+- **Clerk Authentication**: Uses [Clerk](https://clerk.com/) for user sign-in; unified auth for Web UI and API
 
 ## Two Research Modes
 
@@ -37,25 +39,25 @@ A deep research agent built with LangGraph and LangChain, featuring MCP (Model C
 ```mermaid
 graph TB
     subgraph entry [Entry]
-        Start([用户查询])
+        Start([User query])
     end
 
-    subgraph clarify_phase [意图澄清]
+    subgraph clarify_phase [Intent clarification]
         Clarify[Clarify Node]
-        UserInput([用户回答])
-        Clarify -->|需要澄清| UserInput
+        UserInput([User reply])
+        Clarify -->|needs clarification| UserInput
         UserInput --> Clarify
     end
 
-    subgraph analyze_phase [查询分析]
+    subgraph analyze_phase [Query analysis]
         Analyze[Analyze Node]
     end
 
-    subgraph discovery_phase [前置探索]
+    subgraph discovery_phase [Pre-research discovery]
         Discover[Discover Node]
     end
 
-    subgraph parallel [并行研究]
+    subgraph parallel [Parallel research]
         Plan[Plan Sections Node]
         R1[Researcher 1]
         R2[Researcher 2]
@@ -70,34 +72,33 @@ graph TB
         RN --> Aggregate
     end
 
-    subgraph review_loop [评估闭环]
+    subgraph review_loop [Review loop]
         Review[Review Node]
-        Review -->|章节不足| Plan
+        Review -->|insufficient sections| Plan
     end
 
     subgraph output [Output]
         Report[Final Report Node]
-        Final([研究报告])
+        Final([Research report])
     end
 
     Start --> Clarify
     Clarify --> Analyze
-    Analyze -->|list 类型| Discover
-    Analyze -->|其他类型| Plan
+    Analyze -->|list type| Discover
+    Analyze -->|other types| Plan
     Discover --> Plan
     Aggregate --> Review
-    Review -->|证据充足| Report
+    Review -->|sufficient evidence| Report
     Report --> Final
 ```
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip
-- Node.js (for Hacker News MCP server via npx)
 - API key for Aliyun DashScope (default), Anthropic, or OpenAI
-- Jina API key (for web content reading)
-- Clerk 账号与密钥（使用 Web UI 时必需，见 [Clerk 用户认证](#clerk-用户认证)）
+- Keys for optional integrations as needed: Jina or Zyte (content reader), Tavily (web search), etc. — see `env.example`
+- Clerk account and keys (required when using the Web UI; see [Clerk authentication](#clerk-authentication))
 
 ## Installation
 
@@ -120,17 +121,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install -e .
 ```
 
-### 3. Install MCP Servers
-
-#### Hacker News MCP Server
-
-```bash
-# Will be installed automatically via npx when the agent runs
-# Or install globally:
-npm install -g mcp-hacker-news
-```
-
-### 4. Configure Environment Variables
+### 3. Configure Environment Variables
 
 Create a `.env` file in the project root:
 
@@ -235,41 +226,41 @@ The frontend development server runs on `http://localhost:3001` by default (prod
 
 **Important**: The frontend needs to connect to the backend API, so make sure the backend service is running first.
 
-### Clerk 用户认证
+### Clerk authentication
 
-本项目的 Web UI 和 API 使用 [Clerk](https://clerk.com/) 作为用户登录管理服务，实现前后端统一的身份认证。
+The Web UI and API use [Clerk](https://clerk.com/) for sign-in and unified identity across frontend and backend.
 
-#### 获取 Clerk 密钥
+#### Obtaining Clerk keys
 
-1. 访问 [Clerk Dashboard](https://dashboard.clerk.com/)
-2. 创建应用或选择现有应用
-3. 在 **API Keys** 页面获取：
-   - **Publishable Key**：用于前端（以 `pk_` 开头）
-   - **Secret Key**：用于后端（以 `sk_` 开头）
+1. Open the [Clerk Dashboard](https://dashboard.clerk.com/)
+2. Create an application or select an existing one
+3. On the **API Keys** page, copy:
+   - **Publishable Key** — frontend (`pk_…`)
+   - **Secret Key** — backend (`sk_…`)
 
-#### 前端配置
+#### Frontend configuration
 
-在 `web-ui/` 目录下创建 `.env.local`（可参考 `web-ui/.env.local.example`）：
+In `web-ui/`, create `.env.local` (see `web-ui/.env.local.example`):
 
 ```bash
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxx
 CLERK_SECRET_KEY=sk_test_xxxx
 ```
 
-#### 后端配置
+#### Backend configuration
 
-在项目根目录的 `.env` 中添加：
+Add to the project root `.env`:
 
 ```bash
 # Clerk Authentication (required for API protection)
 CLERK_SECRET_KEY=sk_test_xxxx
-# 可选：指定允许的前端域名（逗号分隔），默认包含 localhost:3000 等开发地址
+# Optional: comma-separated allowed frontend origins (defaults include localhost dev URLs)
 # CLERK_AUTHORIZED_PARTIES=http://localhost:3000,https://your-production-domain.com
 ```
 
-#### 部署说明
+#### Deployment notes
 
-生产环境下，Next.js 使用 standalone 模式时需确保 Clerk 环境变量正确加载（例如通过 `dotenv-cli`）。详见 [部署网络问题排查 - Clerk secretKey 缺失](docs/deployment-network-troubleshooting.md#31-clerk-secretkey-缺失)。
+In production with Next.js standalone mode, ensure Clerk env vars are loaded (e.g. via `dotenv-cli`). See [Deployment troubleshooting — Clerk secretKey missing](docs/deployment-network-troubleshooting.md#31-clerk-secretkey-缺失).
 
 ## Usage
 
@@ -295,10 +286,10 @@ uv run python -m src.main -p openrouter --model openai/gpt-4o
 ### Single Query Mode
 
 ```bash
-uv run python -m src.main -q "帮我深度总结一下 hacker news 和 huggingface 上今天的热门话题和论文的主要内容，并形成一篇详细的报告" -v
+uv run python -m src.main -q "Summarize today's trending topics on Hacker News and Hugging Face papers in a detailed report" -v
 
 # With thinking mode enabled
-uv run python -m src.main -q "分析最新的 LLM 论文趋势" --enable-thinking -v
+uv run python -m src.main -q "Analyze the latest LLM paper trends" --enable-thinking -v
 ```
 
 ### Deep Research Mode
@@ -310,24 +301,24 @@ Deep Research Mode uses a section-based parallel architecture for comprehensive 
 uv run python -m src.main --deep-research
 
 # With a query
-uv run python -m src.main --deep-research -q "RAG 技术的最新进展有哪些？"
+uv run python -m src.main --deep-research -q "What are the latest advances in RAG?"
 
 # Custom review iterations (default: 2)
-uv run python -m src.main --deep-research --max-iterations 3 -q "对比 Llama 3 和 GPT-4 的技术架构"
+uv run python -m src.main --deep-research --max-iterations 3 -q "Compare the technical architecture of Llama 3 and GPT-4"
 
 # With verbose logging
 uv run python -m src.main --deep-research -v
 
 # Specify LLM provider
-uv run python -m src.main --deep-research -p anthropic -q "Transformer 的注意力机制演进"
+uv run python -m src.main --deep-research -p anthropic -q "Evolution of attention mechanisms in Transformers"
 
 # Use a specific model
-uv run python -m src.main --deep-research --model kimi-k2.5 -q "LLM 推理优化技术"
+uv run python -m src.main --deep-research --model kimi-k2.5 -q "Latest techniques for LLM inference optimization"
 ```
 
-Deep Research 参数优先级：`CLI 参数 > 环境变量 > 默认值`。  
-默认值：`max_iterations=2`、`max_concurrent=5`、`max_tool_calls=10`。
-约束范围：`max_iterations=1-5`、`max_concurrent=1-10`、`max_tool_calls=1-20`。
+Deep Research parameter precedence: **CLI arguments > environment variables > defaults**.  
+Defaults: `max_iterations=2`, `max_concurrent=5`, `max_tool_calls=10`.  
+Allowed ranges: `max_iterations` 1–5, `max_concurrent` 1–10, `max_tool_calls` 1–20.
 
 **Deep Research Flow:**
 1. **Clarify** - Asks clarifying questions if the query is ambiguous (can be skipped)
@@ -345,29 +336,18 @@ For detailed architecture documentation, see [`src/deep_research/README.md`](src
 #### Normal Mode
 
 ```python
-import asyncio
 from src.agent.research_agent import run_research
-from src.config.mcp_config import get_mcp_config
-from langchain_mcp_adapters.client import MultiServerMCPClient
 
-async def main():
-    # Initialize MCP tools
-    mcp_config = get_mcp_config()
-    async with MultiServerMCPClient(mcp_config) as client:
-        tools = await client.get_tools()
-
-        # Run research with Aliyun (default)
-        result = await run_research(
-            query="Summarize today's Hugging Face papers on transformers",
-            mcp_tools=tools,
-            model_provider="aliyun",  # or "anthropic", "openai"
-            model_name="qwen3.5-plus", # or "qwen3-max", "kimi-k2.5"
-            enable_thinking=True,      # Enable thinking mode (optional)
-        )
-        print(result)
-
-asyncio.run(main())
+result = run_research(
+    query="Summarize today's Hugging Face papers on transformers",
+    model_provider="aliyun",  # or "anthropic", "openai", "openrouter"
+    model_name="qwen3.5-plus",
+    enable_thinking=True,  # optional; supported on some DashScope models
+)
+print(result)
 ```
+
+For async callers, use `run_research_async` from the same module.
 
 #### Deep Research Mode
 
@@ -376,9 +356,8 @@ import asyncio
 from src.deep_research import build_deep_research_graph, run_deep_research
 
 async def main():
-    # Build the deep research graph
+    # Build the deep research graph (tools are assembled inside the graph)
     graph = build_deep_research_graph(
-        hn_mcp_tools=None,  # Optional HN MCP tools
         model_provider="aliyun",
         model_name="qwen3.5-plus",
     )
@@ -401,7 +380,7 @@ async def main():
 
     # Run deep research
     report = await run_deep_research(
-        query="LLM 推理优化的最新技术",
+        query="Latest techniques for LLM inference optimization",
         graph=graph,
         config=config,
         on_clarify_question=on_clarify,
@@ -413,36 +392,30 @@ asyncio.run(main())
 
 ## Available Tools
 
-### Built-in Tools
+Configured tools depend on **mode** and **which agent** is running. The table below counts **business tools** registered in this repo (exact names and source files are in the linked doc).
 
-| Tool | Description |
-|------|-------------|
-| `search_arxiv_papers_tool` | Search ArXiv papers using official API with query syntax support |
-| `get_arxiv_paper_tool` | Fetch detailed metadata for a specific ArXiv paper by ID |
-| `get_huggingface_papers_tool` | Fetches daily papers from Hugging Face with titles and abstracts |
-| `get_huggingface_blog_posts_tool` | Lists Hugging Face blog posts with title, date, upvotes, and URL |
-| `get_jina_reader_tool` | Reads and extracts content from web URLs as markdown |
-| `get_zyte_reader_tool` | Extracts structured article content via Zyte API |
+| Context | # of tools | What it covers |
+|---------|------------|----------------|
+| **Main agent** (normal / interactive mode) | **21** | ArXiv, Hugging Face papers & blog, GitHub search, Tavily, Zyte article list, RSS trio, Hacker News (Firebase API) |
+| **Content reader subagent** | **2** | GitHub README fetch + **one** URL reader (`jina` or `zyte`, see below) |
+| **Deep Research — researcher / discover** | **22** | 20 research tools + `research_complete` + `think` (no RSS tools in this graph) |
+| **Deep Research — clarify node** | **1** | `tavily_search_tool` only |
 
-### Content Reader Configuration
+The main agent is built with **DeepAgents**, which also injects framework tools (e.g. `write_todos`, virtual filesystem helpers, `task` to delegate to subagents). Those are not part of the counts above.
 
-The Content Reader agent supports two reader tools, configured via environment variable:
+**Full tool list, modules, and maintenance notes:** [docs/agent_tools.md](docs/agent_tools.md)
+
+### Content reader backend
 
 ```bash
-# Options: zyte or jina
+# zyte (default) or jina
 CONTENT_READER_TYPE=zyte
 ```
 
 | Reader | Description | Cost |
 |--------|-------------|------|
-| Jina | Converts web pages to markdown | Free |
-| Zyte | Extracts structured article content (title, author, body) | Paid |
-
-### MCP Tools (via external servers)
-
-| Server | Tools | Description |
-|--------|-------|-------------|
-| Hacker News MCP | `getTopStories`, `getBestStories`, `getNewStories`, etc. | Fetch HN stories and discussions |
+| Jina | Converts web pages to markdown | Free tier available |
+| Zyte | Structured article extraction (title, author, body) | Paid |
 
 ## Example Queries
 
@@ -459,9 +432,9 @@ CONTENT_READER_TYPE=zyte
 ### Deep Research Mode (Comprehensive Reports)
 
 ```
-📖 "RAG 技术的最新进展有哪些？" (What are the latest advances in RAG?)
+📖 "What are the latest advances in RAG?"
 
-📖 "对比 Llama 3 和 GPT-4 的技术架构" (Compare Llama 3 and GPT-4 architecture)
+📖 "Compare the technical architecture of Llama 3 and GPT-4"
 
 📖 "Give me a comprehensive report on the latest advances in multimodal AI,
     including papers from ArXiv and Hugging Face, and relevant HN discussions"
@@ -488,12 +461,6 @@ ruff format src/
 
 ## Troubleshooting
 
-### MCP Tools Not Loading
-
-1. Ensure Node.js is installed for the Hacker News MCP server
-2. Check that `npx` is available in your PATH
-3. Verify your PATH includes the necessary executables
-
 ### API Key Errors
 
 1. Ensure your `.env` file exists and contains valid API keys
@@ -501,12 +468,12 @@ ruff format src/
 3. Verify the API key has sufficient quota/credits
 4. For Jina Reader, ensure `JINA_API_KEY` is set
 
-### Clerk 认证问题
+### Clerk authentication issues
 
-1. 确保前后端均配置了正确的 Clerk 密钥（`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`、`CLERK_SECRET_KEY`）
-2. 生产环境 standalone 模式下，需通过 `dotenv-cli` 等方式加载 `.env.local`
-3. 跨域访问时，检查 `CLERK_AUTHORIZED_PARTIES` 是否包含前端域名
-4. 详见 [部署网络问题排查](docs/deployment-network-troubleshooting.md)
+1. Ensure frontend and backend use the correct Clerk keys (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`)
+2. In production standalone mode, load `.env.local` via `dotenv-cli` or equivalent
+3. For cross-origin access, verify `CLERK_AUTHORIZED_PARTIES` includes your frontend origin
+4. See [Deployment network troubleshooting](docs/deployment-network-troubleshooting.md)
 
 ## License
 
@@ -517,7 +484,7 @@ MIT License - See [LICENSE](LICENSE) for details.
 - [LangChain](https://langchain.com/) - LLM framework
 - [LangGraph](https://langchain-ai.github.io/langgraph/) - Agent graph framework
 - [ArXiv API](https://info.arxiv.org/help/api/index.html) - Academic paper search
-- [mcp-hacker-news](https://github.com/erithwik/mcp-hn) - Hacker News integration
+- [Hacker News API](https://github.com/HackerNews/API) - Story and comment data (Firebase JSON)
 - [Hugging Face](https://huggingface.co/) - Daily papers and blog source
 - [Jina AI](https://jina.ai/) - Web content reader
-- [Clerk](https://clerk.com/) - 用户登录与身份认证
+- [Clerk](https://clerk.com/) - User sign-in and identity

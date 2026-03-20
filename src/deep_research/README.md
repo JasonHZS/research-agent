@@ -303,10 +303,10 @@ START → researcher_invoke → tools → [循环或完成] → compress_output 
 |---------|---------|--------|
 | **学术论文** | `search_arxiv_papers_tool`, `get_arxiv_paper_tool` | 高 |
 | **AI 社区** | `get_huggingface_papers_tool`, `get_huggingface_blog_posts_tool` | 高 |
-| **代码平台** | `github_search_tool`, `get_github_readme_tool` | 中 |
+| **代码平台** | `github_search_tool`, `github_readme_tool` | 中 |
 | **技术博客** | `get_zyte_article_list_tool` | 中 |
-| **新闻讨论** | Hacker News MCP Tools | 中 |
-| **通用搜索** | `bocha_web_search_tool` | 低（兜底） |
+| **新闻讨论** | `get_hn_*` 等原生 HN 工具（`src/tools/hacker_news.py`） | 中 |
+| **通用搜索** | `tavily_search_tool` | 低（兜底） |
 | **完成标记** | `research_complete`, `think` | - |
 
 **工具选择策略**：
@@ -456,9 +456,8 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from src.deep_research import build_deep_research_graph, run_deep_research
 
-# 构建 Graph（传入 MCP 工具）
+# 构建 Graph（内部通过 get_all_research_tools() 组装工具）
 graph = build_deep_research_graph(
-    hn_mcp_tools=None,  # 可选的 HN MCP 工具
     model_provider="aliyun",
     model_name="qwen3.5-plus",
 )

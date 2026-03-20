@@ -382,7 +382,7 @@ def run_cli() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Research Agent - Deep research with MCP tools integration"
+        description="Research Agent - Deep research with native API tools and optional Deep Research graph mode"
     )
     parser.add_argument(
         "-q", "--query",

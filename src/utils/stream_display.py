@@ -387,7 +387,7 @@ class MessagesChunkHandler:
         """
         content = getattr(message_chunk, "content", "")
 
-        # Handle list content (e.g., from MCP tools)
+        # Handle list content (e.g., from tool results)
         if isinstance(content, list):
             text_parts = []
             for item in content:

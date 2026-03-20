@@ -1,7 +1,7 @@
 [project]
 name = "research-agent"
 version = "0.1.0"
-description = "A deep research agent using DeepAgents with MCP tools integration"
+description = "A deep research agent using DeepAgents with native API tools (ArXiv, HN, HF, Tavily, RSS, and more)"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"

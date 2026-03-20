@@ -41,8 +41,8 @@ def get_graph():
     """Build and return the Deep Research graph."""
     from src.deep_research.graph import build_deep_research_graph
 
-    # Build the graph with empty tools (we only need the structure)
-    graph = build_deep_research_graph(hn_mcp_tools=[])
+    # Structure-only; tools are wired inside the graph
+    graph = build_deep_research_graph()
     return graph
 
 
