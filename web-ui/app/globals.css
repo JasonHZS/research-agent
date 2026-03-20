@@ -197,6 +197,19 @@
   @apply bg-muted font-medium;
 }
 
+/* Math formula styles */
+.markdown-content .katex {
+  @apply max-w-full;
+}
+
+.markdown-content .katex-display {
+  @apply my-4 overflow-x-auto overflow-y-hidden;
+}
+
+.markdown-content .katex-display > .katex {
+  @apply min-w-max;
+}
+
 /* Code block styles */
 .markdown-content pre {
   @apply bg-muted rounded-lg p-4 overflow-x-auto my-4 text-sm;

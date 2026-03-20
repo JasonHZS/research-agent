@@ -30,12 +30,15 @@ DEFAULT_TIMEOUT = httpx.Timeout(
 )
 
 # Aliyun DashScope 模型映射
-# kimi-k2.5 使用月之暗面（Moonshot AI）直供的模型推理服务，API 模型名为 kimi/kimi-k2.5
-# 参见：https://help.aliyun.com/zh/model-studio/kimi-api-by-moonshot-ai
+# kimi-k2.5：默认映射为百炼部署名 kimi-k2.5（与 Agent 工具多轮兼容）。
+# 若改用 Moonshot 直供名 kimi/kimi-k2.5：直供在开启思考时，多轮工具调用会校验历史中
+# 「带 tool_calls 的 assistant」是否含 reasoning_content；需关闭思考（不传/显式 false
+# enable_thinking），或在请求序列化层为上述消息补齐 reasoning_content，否则易 400。
+# 直供与部署说明：https://help.aliyun.com/zh/model-studio/kimi-api-by-moonshot-ai
 ALIYUN_MODELS = {
     "qwen3.5-plus": "qwen3.5-plus",
     "qwen3-max": "qwen3-max",
-    "kimi-k2.5": "kimi/kimi-k2.5",
+    "kimi-k2.5": "kimi-k2.5",
     "glm-5": "glm-5",
     # MiniMax-M2.1 暂不支持：模型在处理 Function Calling 时返回非 JSON 格式的 arguments
     # 错误: "The 'function.arguments' parameter of the code model must be in JSON format."
@@ -52,7 +55,7 @@ OPENROUTER_MODELS = {
     "minimax-m2.7": "minimax/minimax-m2.7",
     "glm-5-turbo": "z-ai/glm-5-turbo",
 }
-DEFAULT_OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6"
+DEFAULT_OPENROUTER_MODEL = "z-ai/glm-5-turbo"
 
 
 def is_openrouter_model(model_name: Optional[str]) -> bool:
@@ -87,7 +90,8 @@ def create_llm(
     Args:
         model_provider: LLM 提供商 (aliyun, openai, anthropic, openrouter)。
         model_name: 具体的模型名称，未提供时使用默认值。
-        enable_thinking: 是否启用思考模式（仅部分模型支持，如 qwen3.5-plus/qwen3-max/kimi-k2.5/GLM via DashScope）。
+        enable_thinking: 是否启用思考模式（仅部分模型支持，如 qwen3.5-plus、qwen3-max、
+            kimi-k2.5、GLM via DashScope）。
 
     Returns:
         LLM 实例 (ChatOpenAI 或 ChatAnthropic)。

@@ -3,7 +3,9 @@
 import { useState, useCallback, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import rehypeHighlight from 'rehype-highlight';
+import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import { Check, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -92,8 +94,8 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
   return (
     <ReactMarkdown
       className={cn('markdown-content', className)}
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeHighlight, rehypeRaw]}
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeHighlight, rehypeKatex, rehypeRaw]}
       components={{
         code: CodeBlock as any,
         a: CustomLink as any,

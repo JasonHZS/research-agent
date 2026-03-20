@@ -59,8 +59,9 @@ export function MessageList({ className }: MessageListProps) {
 
   // Resume auto-scroll button handler
   const scrollToBottom = useCallback(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+    const viewport = viewportRef.current;
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
       setAutoScrollEnabled(true);
       setShowScrollButton(false);
     }
@@ -68,8 +69,9 @@ export function MessageList({ className }: MessageListProps) {
 
   // Auto-scroll logic
   useEffect(() => {
-    if (autoScrollEnabled && scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+    const viewport = viewportRef.current;
+    if (autoScrollEnabled && viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
     }
   }, [
     currentMessages,

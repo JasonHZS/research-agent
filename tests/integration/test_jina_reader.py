@@ -25,7 +25,7 @@ def test_jina_reader():
     print("=" * 60)
 
     # Test URL - using a simple example
-    test_url = "https://apple.github.io/ml-sharp/"
+    test_url = "https://blog.langchain.com/autonomous-context-compression/"
 
     print(f"\n📎 Fetching content from: {test_url}")
     print("-" * 60)
@@ -42,9 +42,10 @@ def test_jina_reader():
     else:
         print("\n✅ Successfully fetched content!")
         print(f"\n📄 Result (first 2000 chars):\n")
-        print(result[:2000])
-        if len(result) > 2000:
-            print(f"\n... (truncated, total length: {len(result)} chars)")
+        print(result)
+        # print(result[:2000])
+        # if len(result) > 2000:
+        #     print(f"\n... (truncated, total length: {len(result)} chars)")
 
     print("\n" + "-" * 60)
 
