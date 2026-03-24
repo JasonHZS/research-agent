@@ -2,6 +2,13 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('next/dynamic', () => ({
+  default: (loader: () => Promise<unknown>) => {
+    void loader;
+    return () => null;
+  },
+}));
+
 import Home from './page';
 
 const getTokenMock = vi.fn();

@@ -1,11 +1,17 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect } from 'react';
-import { SignedIn, SignedOut, SignInButton, useAuth } from '@clerk/nextjs';
+import { SignedIn, SignedOut, useAuth } from '@clerk/nextjs';
 import { ChatContainer } from '@/components/chat/ChatContainer';
 import { FeedTicker } from '@/components/feed-ticker';
 import { TodoSidebar } from '@/components/chat/TodoSidebar';
 import { useChatStore } from '@/hooks/useChat';
+
+const LoginPage = dynamic(
+  () => import('@/components/login').then((mod) => mod.LoginPage),
+  { ssr: false, loading: () => null },
+);
 
 export default function Home() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -32,19 +38,7 @@ export default function Home() {
   return (
     <>
       <SignedOut>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <h2 className="text-2xl font-semibold">Research Agent</h2>
-            <p className="text-muted-foreground">
-              Sign in to continue
-            </p>
-            <SignInButton mode="modal">
-              <button className="px-6 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                Sign In
-              </button>
-            </SignInButton>
-          </div>
-        </div>
+        <LoginPage />
       </SignedOut>
       <SignedIn>
         {/* Global floating todo sidebar */}

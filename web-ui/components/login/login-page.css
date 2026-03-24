@@ -1,0 +1,442 @@
+/* ═══════════════════════════════════════════════
+   Blueprint Login Page — faithful to original
+   ═══════════════════════════════════════════════ */
+
+.login-page {
+  --paper-bg: #F4F4F0;
+  --ink-black: #1A1A18;
+  --graphite: #A0A09A;
+  --graphite-light: rgba(160, 160, 154, 0.4);
+  --accent-orange: #FF6B00;
+  --shadow-soft: 0 10px 30px rgba(0,0,0,0.08);
+  --shadow-hard: 2px 4px 10px rgba(0,0,0,0.15);
+  --font-login-space-mono: "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-login-reenie-beanie: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  --font-login-caveat: "Brush Script MT", "Segoe Script", "Apple Chancery", cursive;
+  --font-login-nanum-pen-script: "Bradley Hand", "Segoe Print", "Chalkboard SE", cursive;
+
+  width: 100%;
+  height: 100vh;
+  background-color: var(--paper-bg);
+  background-image: radial-gradient(circle at 50% 50%, transparent 0%, rgba(0,0,0,0.02) 100%);
+  overflow: hidden;
+  font-family: var(--font-login-space-mono), monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+/* ═══════════════════════════════════════════════
+   Dark Mode Overrides
+   ═══════════════════════════════════════════════ */
+
+.dark .login-page {
+  --paper-bg: #1a1a1f;
+  --ink-black: #e8e8e4;
+  --graphite: #6a6a72;
+  --graphite-light: rgba(100, 100, 112, 0.35);
+  --accent-orange: #FF7A1A;
+  --shadow-soft: 0 10px 30px rgba(0,0,0,0.3);
+  --shadow-hard: 2px 4px 10px rgba(0,0,0,0.4);
+
+  background-image: radial-gradient(circle at 50% 50%, transparent 0%, rgba(0,0,0,0.15) 100%);
+}
+
+/* Mechanical pencil — lighter body on dark */
+.dark .login-page .mech-pencil {
+  background: linear-gradient(to right, #555 0%, #777 30%, #444 100%);
+  box-shadow: 15px 15px 20px rgba(0,0,0,0.35), inset -2px 0 5px rgba(0,0,0,0.2);
+}
+
+.dark .login-page .mech-pencil::after {
+  background: linear-gradient(to right, #555, #777, #444);
+}
+
+/* Black pencil — slightly lighter for contrast */
+.dark .login-page .black-pencil {
+  background: linear-gradient(to bottom, #3a3a3a 0%, #222 50%, #3a3a3a 100%);
+  box-shadow: 10px -10px 20px rgba(0,0,0,0.4);
+}
+
+.dark .login-page .black-pencil::after {
+  background: #8a7558;
+}
+
+/* Fineliner — slightly lighter */
+.dark .login-page .fineliner {
+  background: #2a2a2a;
+  box-shadow: -10px 15px 25px rgba(0,0,0,0.4), inset 0 2px 5px rgba(255,255,255,0.05);
+}
+
+.dark .login-page .fineliner-cap {
+  background: linear-gradient(to bottom, #444, #2a2a2a);
+}
+
+.dark .login-page .fineliner-tip {
+  background: #2a2a2a;
+}
+
+/* Eraser — darker tone */
+.dark .login-page .eraser {
+  background: #555560;
+  box-shadow:
+    inset 2px 2px 5px rgba(255,255,255,0.15),
+    inset -3px -3px 8px rgba(0,0,0,0.25),
+    15px 20px 20px rgba(0,0,0,0.35);
+  filter: contrast(0.9) sepia(0.05);
+}
+
+/* Shavings */
+.dark .login-page .shaving {
+  background: #3a3a40;
+  box-shadow: 1px 1px 2px rgba(0,0,0,0.25);
+}
+
+.login-page .svg-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* ── Workspace ── */
+.login-page .workspace {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ── Sketch Composition (center area) ── */
+.login-page .sketch-composition {
+  position: relative;
+  width: 800px;
+  height: 500px;
+  z-index: 10;
+}
+
+/* ── Drafting Layer (SVG lines) ── */
+.login-page .drafting-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.login-page .draft-line {
+  stroke: var(--graphite-light);
+  stroke-width: 1px;
+  fill: none;
+}
+
+.login-page .draft-line-dash {
+  stroke: var(--graphite-light);
+  stroke-width: 1px;
+  stroke-dasharray: 4 4;
+  fill: none;
+}
+
+.login-page .draft-accent {
+  stroke: var(--accent-orange);
+  stroke-width: 1px;
+  fill: none;
+}
+
+/* ── Text Layer ── */
+.login-page .text-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 2;
+}
+
+.login-page .brief-text {
+  font-family: var(--font-login-reenie-beanie), cursive;
+  color: var(--graphite);
+  font-size: 24px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: -10px;
+  transform: rotate(-1deg);
+}
+
+.login-page .brief-text.bottom {
+  margin-top: 10px;
+  font-size: 20px;
+  transform: rotate(0.5deg);
+}
+
+/* Orange "Log in" button */
+.login-page .login-link {
+  font-family: var(--font-login-caveat), cursive;
+  font-weight: 700;
+  font-size: 110px;
+  line-height: 0.9;
+  color: var(--accent-orange);
+  text-align: center;
+  filter: url(#ink-bleed);
+  transform: rotate(-2deg);
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  text-decoration: none;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.login-page .login-link:hover {
+  transform: rotate(-2deg) scale(1.03);
+  opacity: 0.85;
+}
+
+/* ── Annotations ── */
+.login-page .annotation {
+  position: absolute;
+  font-family: var(--font-login-space-mono), monospace;
+  font-size: 10px;
+  color: var(--graphite);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.login-page .note-hand {
+  font-family: var(--font-login-nanum-pen-script), cursive;
+  font-size: 18px;
+  color: var(--graphite);
+  text-transform: none;
+  letter-spacing: 1px;
+}
+
+.login-page .note-1 { top: 20%; left: 5%; transform: rotate(-5deg); }
+.login-page .note-2 { top: 15%; right: 10%; transform: rotate(3deg); }
+.login-page .note-3 { bottom: 25%; left: 15%; transform: rotate(-2deg); }
+.login-page .note-4 { bottom: 18%; right: 15%; transform: rotate(4deg); color: var(--accent-orange); }
+
+/* ═══════════════════════════════════════════════
+   Physical Tools
+   ═══════════════════════════════════════════════ */
+
+.login-page .physical-tools {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* ── Mechanical Pencil (silver, top-left, vertical) ── */
+.login-page .mech-pencil {
+  position: absolute;
+  top: -50px;
+  left: 10vw;
+  width: 12px;
+  height: 400px;
+  background: linear-gradient(to right, #e0e0e0 0%, #ffffff 30%, #a0a0a0 100%);
+  border-radius: 6px;
+  transform: rotate(25deg);
+  box-shadow: 15px 15px 20px rgba(0,0,0,0.15), inset -2px 0 5px rgba(0,0,0,0.1);
+  z-index: 21;
+}
+
+.login-page .mech-pencil::before {
+  content: '';
+  position: absolute;
+  bottom: 60px;
+  left: 0;
+  width: 100%;
+  height: 80px;
+  background: repeating-linear-gradient(to bottom, #333, #333 2px, #222 2px, #222 4px);
+  border-radius: 2px;
+}
+
+.login-page .mech-pencil::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 60px;
+  background: linear-gradient(to right, #999, #ccc, #666);
+  clip-path: polygon(0 0, 100% 0, 80% 80%, 55% 100%, 45% 100%, 20% 80%);
+}
+
+.login-page .mech-lead {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 10px;
+  background: #444;
+}
+
+/* ── Black Pencil (bottom-left, horizontal) ── */
+.login-page .black-pencil {
+  position: absolute;
+  bottom: -100px;
+  left: -50px;
+  width: 450px;
+  height: 14px;
+  background: linear-gradient(to bottom, #2a2a2a 0%, #111 50%, #2a2a2a 100%);
+  transform: rotate(-35deg);
+  box-shadow: 10px -10px 20px rgba(0,0,0,0.2);
+  z-index: 22;
+}
+
+.login-page .black-pencil::after {
+  content: '';
+  position: absolute;
+  right: -40px;
+  top: 0;
+  width: 40px;
+  height: 100%;
+  background: #d4b58e;
+  clip-path: polygon(0 0, 0 100%, 100% 50%);
+}
+
+.login-page .black-pencil-lead {
+  position: absolute;
+  right: -40px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 4px;
+  background: #222;
+  clip-path: polygon(0 0, 0 100%, 100% 50%);
+  z-index: 2;
+}
+
+.login-page .pencil-stripe {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #FFB000;
+}
+
+/* ── Fineliner (right side, angled) ── */
+.login-page .fineliner {
+  position: absolute;
+  top: 30vh;
+  right: -100px;
+  width: 350px;
+  height: 12px;
+  background: #111;
+  border-radius: 6px;
+  transform: rotate(-15deg);
+  box-shadow: -10px 15px 25px rgba(0,0,0,0.2), inset 0 2px 5px rgba(255,255,255,0.1);
+  z-index: 23;
+}
+
+.login-page .fineliner-cap {
+  position: absolute;
+  left: -30px;
+  top: 0;
+  width: 30px;
+  height: 100%;
+  background: linear-gradient(to bottom, #333, #111);
+  border-radius: 4px 0 0 4px;
+}
+
+.login-page .fineliner-tip {
+  position: absolute;
+  left: -40px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 4px;
+  background: #111;
+}
+
+/* ── Eraser ── */
+.login-page .eraser {
+  position: absolute;
+  top: 15vh;
+  right: 15vw;
+  width: 45px;
+  height: 35px;
+  background: #C4C4C0;
+  border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  transform: rotate(15deg);
+  box-shadow:
+    inset 2px 2px 5px rgba(255,255,255,0.8),
+    inset -3px -3px 8px rgba(0,0,0,0.1),
+    15px 20px 20px rgba(0,0,0,0.15);
+  z-index: 24;
+  filter: contrast(0.9) sepia(0.1);
+}
+
+/* ── Debris / Shavings ── */
+.login-page .debris {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.login-page .shaving {
+  position: absolute;
+  background: #D8D8D4;
+  border-radius: 50%;
+  box-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .login-page .sketch-composition {
+    width: 95vw;
+    height: auto;
+    aspect-ratio: 8 / 5;
+  }
+
+  .login-page .login-link {
+    font-size: 60px;
+  }
+
+  .login-page .brief-text {
+    font-size: 18px;
+  }
+
+  .login-page .brief-text.bottom {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .login-page .physical-tools,
+  .login-page .debris {
+    display: none;
+  }
+
+  .login-page .login-link {
+    font-size: 48px;
+  }
+
+  .login-page .annotation {
+    font-size: 7px;
+  }
+
+  .login-page .note-hand {
+    font-size: 14px;
+  }
+}
