@@ -11,7 +11,7 @@
 - **实体发现**：针对「列表类」问题（如「最好的 X 有哪些？」），在深入调研前先发现相关实体
 - **ArXiv 检索**：通过 ArXiv 官方 API 搜索与获取学术论文
 - **Hacker News**：通过官方 Firebase API 获取趋势与讨论数据（`src/tools/hacker_news.py`）
-- **Hugging Face 每日论文**：获取每日精选 AI/ML 论文标题与摘要
+- **Hugging Face 论文**：获取 Hugging Face 的日 / 周 / 月 / 趋势 AI/ML 论文列表及元数据
 - **Hugging Face 博客**：浏览官方与社区博文及元数据
 - **多模型支持**：兼容阿里云（qwen3.5-plus、qwen3-max、kimi-k2.5）、Anthropic Claude、OpenAI GPT
 - **思考模式**：部分模型可选开启思考模式（qwen3.5-plus、qwen3-max、kimi-k2.5）
@@ -478,6 +478,6 @@ MIT License — 见 [LICENSE](LICENSE)。
 - [LangGraph](https://langchain-ai.github.io/langgraph/) — 智能体图框架
 - [ArXiv API](https://info.arxiv.org/help/api/index.html) — 学术论文检索
 - [Hacker News API](https://github.com/HackerNews/API) — 故事与评论（Firebase JSON）
-- [Hugging Face](https://huggingface.co/) — 每日论文与博客源
+- [Hugging Face](https://huggingface.co/) — 日 / 周 / 月 / 趋势论文与博客源
 - [Jina AI](https://jina.ai/) — 网页内容阅读
 - [Clerk](https://clerk.com/) — 用户登录与身份认证

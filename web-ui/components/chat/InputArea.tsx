@@ -269,7 +269,7 @@ export function InputArea({
           </button>
 
           <button
-            onClick={() => setInput('最近一周huggingface 上的 top5 paper 都有哪些？帮我总结一下')}
+            onClick={() => setInput('最近一周 huggingface 上的 top5 paper 和热门趋势 top5 的论文都哪些？帮我总结一下')}
             className="group relative overflow-hidden rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:scale-[1.01] border border-orange-200/50 dark:border-orange-800/30"
           >
             {/* Gradient Background */}
@@ -281,7 +281,7 @@ export function InputArea({
                   前沿论文精选
                 </h3>
                 <p className="text-xs font-medium text-amber-900/70 dark:text-amber-100/60 leading-relaxed">
-                  总结本周 Hugging Face 上最热门的 5 篇论文。
+                  总结本周 Hugging Face 上的热门论文。
                 </p>
               </div>
               

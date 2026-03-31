@@ -24,6 +24,7 @@ from src.tools.hf_blog import (
 )
 from src.tools.hf_daily_papers import (
     fetch_huggingface_daily_papers,
+    fetch_huggingface_trending_papers,
     get_huggingface_papers_tool,
 )
 from src.tools.jina_reader import (
@@ -52,6 +53,7 @@ __all__ = [
     "search_arxiv",
     "search_arxiv_papers_tool",
     "fetch_huggingface_daily_papers",
+    "fetch_huggingface_trending_papers",
     "get_huggingface_papers_tool",
     "fetch_huggingface_blog_posts",
     "get_huggingface_blog_posts_tool",

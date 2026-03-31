@@ -19,7 +19,7 @@
 - `get_arxiv_paper_tool`: Get detailed metadata for a specific ArXiv paper by ID, including title, authors, abstract, categories, and PDF link.
 
 ### 热门资讯
-- `get_huggingface_papers_tool`: Get daily trending AI/ML papers from HuggingFace, including title, ArXiv ID, upvotes, and comments count.
+- `get_huggingface_papers_tool`: Get daily, weekly, monthly, or trending AI/ML papers from HuggingFace, including title, ArXiv ID, upvotes, comments count, and trending GitHub stars when available.
 - `get_huggingface_blog_posts_tool`: Get HuggingFace blog post listings with title, date, upvotes, and URL.
 - Hacker News tools: Get trending tech discussions and stories from HN.
 

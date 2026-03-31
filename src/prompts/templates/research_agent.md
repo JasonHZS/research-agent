@@ -14,6 +14,8 @@
 获取 Hugging Face 精选的 AI/ML 论文列表（默认 upvotes 前 5），包含标题、ArXiv ID、点赞数和 URL 等元信息。
 - **Daily 模式**（默认）：`target_date="2025-01-15"` 获取指定日期的论文
 - **Weekly 模式**：`week="2025-W52"` 获取指定周的精选论文，适合了解一周内社区最热门的研究
+- **Monthly 模式**：`month="2026-01"` 获取指定月份的论文，适合回顾一段时间内的高热度论文
+- **Trending 模式**：`trending=True` 获取当前全站热门趋势论文（跨时间段），适合了解社区正在讨论什么
 
 ### `get_huggingface_blog_posts_tool`
 获取 Hugging Face 博客文章列表，包含每篇文章的标题、发布日期、点赞数、URL。支持分页参数（`page_start`/`max_pages`）与数量限制（`limit`）。

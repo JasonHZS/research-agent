@@ -343,7 +343,8 @@ async def main(
                     print("Goodbye!")
                     break
                 if user_input.lower() == "new":
-                    # Start a new conversation thread
+                    # A fresh thread_id isolates checkpointed chat history.
+                    # Keep the existing store so /memories/ long-term data survives across threads.
                     thread_id = str(uuid.uuid4())
                     print(f"🔄 New session started. Session ID: {thread_id[:8]}...")
                     continue

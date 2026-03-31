@@ -15,7 +15,7 @@
 
 | #   | 工具名（LLM 可见）                       | 说明                                  | 实现模块                           |
 | --- | --------------------------------- | ----------------------------------- | ------------------------------ |
-| 1   | `get_huggingface_papers_tool`     | Hugging Face 论文列表（日/周/月等）           | `src/tools/hf_daily_papers.py` |
+| 1   | `get_huggingface_papers_tool`     | Hugging Face 论文列表（日/周/月/趋势）         | `src/tools/hf_daily_papers.py` |
 | 2   | `get_huggingface_blog_posts_tool` | Hugging Face 博客文章                   | `src/tools/hf_blog.py`         |
 | 3   | `get_arxiv_paper_tool`            | 按 ArXiv ID 获取单篇论文信息                 | `src/tools/arxiv_api.py`       |
 | 4   | `search_arxiv_papers_tool`        | ArXiv 检索                            | `src/tools/arxiv_api.py`       |

@@ -11,7 +11,7 @@ A deep research agent built with LangGraph, LangChain, and DeepAgents, using nat
 - **Entity Discovery**: For "list" queries (e.g., "What are the best X?"), discovers all relevant entities before deep diving
 - **ArXiv Search**: Search and retrieve academic papers using ArXiv's official API
 - **Hacker News Integration**: Trending and discussion data via the official Hacker News Firebase API (`src/tools/hacker_news.py`)
-- **Hugging Face Daily Papers**: Fetch daily featured AI/ML papers with titles and abstracts
+- **Hugging Face Papers**: Fetch daily / weekly / monthly / trending AI/ML paper lists from Hugging Face with metadata
 - **Hugging Face Blog**: Browse official and community blog posts with metadata
 - **Multi-LLM Support**: Works with Aliyun (qwen3.5-plus, qwen3-max, kimi-k2.5), Anthropic Claude, and OpenAI GPT
 - **Thinking Mode**: Optional thinking mode for supported models (qwen3.5-plus, qwen3-max, kimi-k2.5)
@@ -485,6 +485,6 @@ MIT License - See [LICENSE](LICENSE) for details.
 - [LangGraph](https://langchain-ai.github.io/langgraph/) - Agent graph framework
 - [ArXiv API](https://info.arxiv.org/help/api/index.html) - Academic paper search
 - [Hacker News API](https://github.com/HackerNews/API) - Story and comment data (Firebase JSON)
-- [Hugging Face](https://huggingface.co/) - Daily papers and blog source
+- [Hugging Face](https://huggingface.co/) - Daily, weekly, monthly, trending papers and blog source
 - [Jina AI](https://jina.ai/) - Web content reader
 - [Clerk](https://clerk.com/) - User sign-in and identity

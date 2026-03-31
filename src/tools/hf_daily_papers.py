@@ -1,8 +1,8 @@
 """
 Hugging Face Daily Papers Tool
 
-This module provides functionality to fetch daily and weekly papers from Hugging Face,
-extracting titles, upvotes, and comments for each paper.
+This module provides functionality to fetch daily, weekly, monthly, and trending
+papers from Hugging Face, extracting titles, upvotes, and comments for each paper.
 """
 
 import json
@@ -437,47 +437,139 @@ def _extract_papers_fallback(soup: BeautifulSoup, target_date: str) -> list[dict
     return papers
 
 
+def fetch_huggingface_trending_papers(
+    limit: Optional[int] = 20,
+) -> list[dict]:
+    """
+    Fetch trending papers from Hugging Face via the official API.
+
+    Unlike daily/weekly/monthly modes which scrape HTML pages, this uses
+    the ``/api/daily_papers?sort=trending`` JSON endpoint for reliability.
+
+    Args:
+        limit: Maximum number of papers to return. Defaults to 20.
+
+    Returns:
+        List of dictionaries containing paper information with keys:
+        - title: Paper title
+        - arxiv_id: ArXiv paper ID
+        - url: URL to the paper on Hugging Face
+        - upvotes: Number of upvotes
+        - num_comments: Number of comments
+        - summary: Brief AI-generated summary (if available)
+        - github_repo: GitHub repository URL (if available)
+        - github_stars: GitHub star count (if available)
+
+    Raises:
+        requests.RequestException: If the HTTP request fails.
+    """
+    api_url = "https://huggingface.co/api/daily_papers"
+    params: dict[str, str | int] = {"sort": "trending"}
+    if limit and limit > 0:
+        params["limit"] = limit
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json",
+    }
+
+    response = requests.get(api_url, params=params, headers=headers, timeout=30)
+    response.raise_for_status()
+
+    data = response.json()
+    papers: list[dict] = []
+
+    for entry in data:
+        paper_data = entry.get("paper", entry)
+        arxiv_id = paper_data.get("id")
+        title = paper_data.get("title")
+
+        if not arxiv_id or not title:
+            continue
+
+        paper_info: dict = {
+            "title": title,
+            "arxiv_id": arxiv_id,
+            "url": f"https://huggingface.co/papers/{arxiv_id}",
+            "upvotes": paper_data.get("upvotes", 0),
+            "num_comments": entry.get("numComments", 0),
+        }
+
+        # Include AI summary when available (trending API provides it)
+        ai_summary = paper_data.get("ai_summary")
+        if ai_summary:
+            paper_info["summary"] = ai_summary
+
+        # Include GitHub info when available
+        github_repo = paper_data.get("githubRepo")
+        if github_repo:
+            paper_info["github_repo"] = github_repo
+        github_stars = paper_data.get("githubStars")
+        if github_stars is not None:
+            paper_info["github_stars"] = github_stars
+
+        papers.append(paper_info)
+
+    return papers
+
+
 @tool
 def get_huggingface_papers_tool(
     target_date: Optional[str] = None,
     week: Optional[str] = None,
     month: Optional[str] = None,
+    trending: bool = False,
     limit: Optional[int] = None,
 ) -> str:
     """
-    Get daily, weekly, or monthly papers from Hugging Face with their titles, upvotes, and comments.
+    Get daily, weekly, monthly, or trending papers from Hugging Face
+    with their titles, upvotes, and comments.
 
     Use this tool to fetch the latest AI/ML research papers featured on
     Hugging Face's papers page. Each paper includes title, ArXiv ID,
     upvotes count, and comments count.
 
-    You can fetch papers in three modes:
+    You can fetch papers in four modes:
     - Daily mode: Get papers for a specific date (default behavior)
     - Weekly mode: Get featured papers for a specific week (use `week` parameter)
     - Monthly mode: Get papers for a specific month (use `month` parameter)
+    - Trending mode: Get currently trending papers across all time (use `trending=True`)
 
     Args:
-        target_date: Date in 'YYYY-MM-DD' format for daily papers. Defaults to 
-                    today's date if no time parameter is specified.
-        week: Week in 'YYYY-WXX' format (e.g., '2025-W52', which is Dec 21-27) for weekly featured papers.
-        month: Month in 'YYYY-MM' format (e.g., '2026-01') for monthly papers.
-               Priority: month > week > target_date
-        limit: Optional number of top-voted papers to return. If not provided,
-               returns all papers.
+        target_date: Date in 'YYYY-MM-DD' format for daily papers.
+                    Defaults to today's date if no time parameter is specified.
+        week: Week in 'YYYY-WXX' format (e.g., '2025-W52') for
+              weekly featured papers.
+        month: Month in 'YYYY-MM' format (e.g., '2026-01') for
+               monthly papers.
+        trending: If True, fetch currently trending papers regardless
+               of date/week/month.
+               Priority: trending > month > week > target_date
+        limit: Optional number of top-voted papers to return.
+               Defaults to 20 for trending mode, all for other modes.
 
     Returns:
-        Formatted string containing papers with their titles, upvotes, and comments.
-    
+        Formatted string with papers, titles, upvotes, and comments.
+
     Examples:
         - Get today's papers: get_huggingface_papers_tool()
-        - Get papers for a specific date: get_huggingface_papers_tool(target_date="2025-01-15")
-        - Get weekly featured papers: get_huggingface_papers_tool(week="2025-W52")
-        - Get monthly papers: get_huggingface_papers_tool(month="2026-01")
-        - Get top 20 monthly papers: get_huggingface_papers_tool(month="2026-01", limit=20)
+        - Specific date: get_huggingface_papers_tool(target_date="2025-01-15")
+        - Weekly: get_huggingface_papers_tool(week="2025-W52")
+        - Monthly: get_huggingface_papers_tool(month="2026-01")
+        - Trending: get_huggingface_papers_tool(trending=True)
+        - Top 10 trending: get_huggingface_papers_tool(trending=True, limit=10)
     """
     try:
-        # Priority: month > week > daily
-        if month:
+        # Priority: trending > month > week > daily
+        if trending:
+            trending_limit = limit if limit else 20
+            papers = fetch_huggingface_trending_papers(limit=trending_limit)
+            time_label = "Current"
+            mode = "Trending"
+        elif month:
             papers = fetch_huggingface_monthly_papers(month, limit=limit)
             time_label = f"Month {month}"
             mode = "Monthly"
@@ -506,7 +598,24 @@ def get_huggingface_papers_tool(
             # Add upvotes and comments
             upvotes = paper.get("upvotes", 0)
             comments = paper.get("num_comments", 0)
-            result_parts.append(f"\n**Upvotes:** {upvotes} | **Comments:** {comments}")
+            stats = f"\n**Upvotes:** {upvotes} | **Comments:** {comments}"
+            if paper.get("github_stars") is not None:
+                stars = paper["github_stars"]
+                stars_str = (
+                    f"{stars / 1000:.1f}k" if stars >= 1000 else str(stars)
+                )
+                stats += f" | **GitHub Stars:** {stars_str}"
+            result_parts.append(stats)
+
+            # Add GitHub repo link if available
+            if paper.get("github_repo"):
+                result_parts.append(
+                    f"\n**GitHub:** {paper['github_repo']}"
+                )
+
+            # Add AI summary if available (trending mode provides this)
+            if paper.get("summary"):
+                result_parts.append(f"\n**Summary:** {paper['summary']}")
 
             result_parts.append("\n")  # Add extra newline separator
 
