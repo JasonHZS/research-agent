@@ -37,13 +37,13 @@ async def main() -> None:
     os.environ.setdefault("LANGCHAIN_DEBUG", "1")
     os.environ.setdefault("LANGCHAIN_DEBUG_LOG", "1")
 
-    graph = build_deep_research_graph(model_provider="aliyun", model_name="qwen3.5-plus")
+    graph = build_deep_research_graph(model_provider="aliyun", model_name="deepseek-v4-flash")
 
     config = {
         "configurable": {
             "thread_id": f"debug_{uuid.uuid4().hex[:8]}",
             "model_provider": "aliyun",
-            "model_name": "qwen3.5-plus",
+            "model_name": "deepseek-v4-flash",
             "allow_clarification": True,
             "max_iterations": 2,
             "max_tool_calls": 10,

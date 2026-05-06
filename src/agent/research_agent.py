@@ -55,15 +55,16 @@ def _get_model_config(
     """
     Get model configuration for the specified provider.
 
-    For providers with custom endpoints (aliyun, openrouter), returns a ChatOpenAI
-    instance in the 'model' key. For standard providers (anthropic, openai), returns
+    For providers with custom endpoints (aliyun, openrouter), returns a
+    ChatOpenAI instance in the 'model' key. For the standard OpenAI provider, returns
     just the model name string, which deepagents will use to create the model.
 
     Args:
-        model_provider: One of 'aliyun', 'anthropic', 'openai', or 'openrouter'.
+        model_provider: One of 'aliyun', 'openai', or 'openrouter'.
         model_name: Specific model name.
         enable_thinking: Whether to enable thinking mode (only supported by some models
-                        like qwen3.5-plus, qwen3-max, kimi-k2.5 via DashScope).
+                        like qwen3.6-plus, kimi-k2.6, DeepSeek V4
+                        via DashScope).
 
     Returns:
         Dictionary with model configuration for deepagents.
@@ -72,8 +73,6 @@ def _get_model_config(
         # Providers with custom endpoints need LLM instance
         llm = create_llm(model_provider, model_name, enable_thinking)
         return {"model": llm}
-    elif model_provider == "anthropic":
-        return {"model": model_name or "claude-sonnet-4-20250514"}
     elif model_provider == "openai":
         return {"model": model_name or "gpt-4o"}
     else:
@@ -114,7 +113,7 @@ def create_research_agent(
     - For disk persistence (across restarts), use SqliteSaver or PostgresSaver.
 
     Args:
-        model_provider: LLM provider ('aliyun', 'anthropic', 'openai', or 'openrouter').
+        model_provider: LLM provider ('aliyun', 'openai', or 'openrouter').
                         Resolved via CLI/env/defaults via centralized settings when not set.
         model_name: Specific model to use. Resolved via CLI/env/defaults when not set.
         system_prompt: Custom system prompt. If provided, overrides prompt_template.
@@ -128,7 +127,7 @@ def create_research_agent(
         debug: If True, enables debug mode with detailed execution logs.
               Uses DeepAgents built-in debug streaming.
         enable_thinking: If True, enables thinking mode for supported models
-                        (e.g., qwen3-max, kimi-k2.5 via DashScope).
+                        (e.g., qwen3.6-plus, kimi-k2.6, DeepSeek V4 via DashScope).
                         The model will show its reasoning process.
 
     Returns:
@@ -244,7 +243,7 @@ def run_research(
 
     Args:
         query: The research question or topic to investigate.
-        model_provider: LLM provider to use ('aliyun', 'anthropic', 'openai', or 'openrouter').
+        model_provider: LLM provider to use ('aliyun', 'openai', or 'openrouter').
                         Resolved via CLI/env/defaults when not set.
         model_name: Specific model name. Resolved via CLI/env/defaults when not set.
         agent: Pre-created agent instance (for multi-turn conversations).
@@ -294,7 +293,7 @@ async def run_research_async(
 
     Args:
         query: The research question or topic to investigate.
-        model_provider: LLM provider to use ('aliyun', 'anthropic', 'openai', or 'openrouter').
+        model_provider: LLM provider to use ('aliyun', 'openai', or 'openrouter').
                         Resolved via CLI/env/defaults when not set.
         model_name: Specific model name. Resolved via CLI/env/defaults when not set.
         agent: Pre-created agent instance (for multi-turn conversations).

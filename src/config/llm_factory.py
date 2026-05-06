@@ -2,7 +2,7 @@
 LLM Factory
 
 统一的 LLM 实例创建模块。
-支持 aliyun, anthropic, openai, openrouter 四种 provider。
+支持 aliyun, openai, openrouter 三种 provider。
 
 该模块整合了之前分散在多处的 LLM 创建逻辑：
 - src/agent/research_agent.py 的 _get_model_config()
@@ -11,10 +11,9 @@ LLM Factory
 
 import os
 import warnings
-from typing import Optional, Union
+from typing import Optional
 
 import httpx
-from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 
 # Streaming 场景下的超时配置
@@ -30,32 +29,33 @@ DEFAULT_TIMEOUT = httpx.Timeout(
 )
 
 # Aliyun DashScope 模型映射
-# kimi-k2.5：默认映射为百炼部署名 kimi-k2.5（与 Agent 工具多轮兼容）。
-# 若改用 Moonshot 直供名 kimi/kimi-k2.5：直供在开启思考时，多轮工具调用会校验历史中
+# kimi-k2.6：默认映射为百炼部署名 kimi-k2.6（与 Agent 工具多轮兼容）。
+# 若改用 Moonshot 直供名 kimi/kimi-k2.6：直供在开启思考时，多轮工具调用会校验历史中
 # 「带 tool_calls 的 assistant」是否含 reasoning_content；需关闭思考（不传/显式 false
 # enable_thinking），或在请求序列化层为上述消息补齐 reasoning_content，否则易 400。
 # 直供与部署说明：https://help.aliyun.com/zh/model-studio/kimi-api-by-moonshot-ai
 ALIYUN_MODELS = {
-    "qwen3.5-plus": "qwen3.5-plus",
-    "qwen3-max": "qwen3-max",
-    "kimi-k2.5": "kimi-k2.5",
-    "glm-5": "glm-5",
+    "qwen3.6-plus": "qwen3.6-plus",
+    "kimi-k2.6": "kimi-k2.6",
+    "glm-5.1": "glm-5.1",
+    "deepseek-v4-pro": "deepseek-v4-pro",
+    "deepseek-v4-flash": "deepseek-v4-flash",
     # MiniMax-M2.1 暂不支持：模型在处理 Function Calling 时返回非 JSON 格式的 arguments
     # 错误: "The 'function.arguments' parameter of the code model must be in JSON format."
     # "minimax-m2.1": "MiniMax-M2.1",
 }
-DEFAULT_ALIYUN_MODEL = "qwen3.5-plus"
+DEFAULT_ALIYUN_MODEL = "deepseek-v4-flash"
 
 # OpenRouter 配置
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_MODELS = {
-    "claude-sonnet-4.6": "anthropic/claude-sonnet-4.6",
+    "gpt-5": "openai/gpt-5",
     "gpt-5.2": "openai/gpt-5.2",
     "gemini-3-flash": "google/gemini-3-flash-preview",
     "minimax-m2.7": "minimax/minimax-m2.7",
     "glm-5-turbo": "z-ai/glm-5-turbo",
 }
-DEFAULT_OPENROUTER_MODEL = "z-ai/glm-5-turbo"
+DEFAULT_OPENROUTER_MODEL = "openai/gpt-5"
 
 
 def is_openrouter_model(model_name: Optional[str]) -> bool:
@@ -83,18 +83,18 @@ def create_llm(
     model_provider: str = "aliyun",
     model_name: Optional[str] = None,
     enable_thinking: bool = False,
-) -> Union[ChatOpenAI, ChatAnthropic]:
+) -> ChatOpenAI:
     """
     创建 LLM 实例。
 
     Args:
-        model_provider: LLM 提供商 (aliyun, openai, anthropic, openrouter)。
+        model_provider: LLM 提供商 (aliyun, openai, openrouter)。
         model_name: 具体的模型名称，未提供时使用默认值。
-        enable_thinking: 是否启用思考模式（仅部分模型支持，如 qwen3.5-plus、qwen3-max、
-            kimi-k2.5、GLM via DashScope）。
+        enable_thinking: 是否启用思考模式（仅部分模型支持，如 qwen3.6-plus、
+            kimi-k2.6、DeepSeek V4、GLM via DashScope）。
 
     Returns:
-        LLM 实例 (ChatOpenAI 或 ChatAnthropic)。
+        LLM 实例 (ChatOpenAI)。
 
     Raises:
         ValueError: 未设置必要的 API key 或 provider 未知。
@@ -139,12 +139,6 @@ def create_llm(
     elif model_provider == "openai":
         return ChatOpenAI(
             model=model_name or "gpt-4o",
-            max_retries=5,
-            timeout=DEFAULT_TIMEOUT,
-        )
-    elif model_provider == "anthropic":
-        return ChatAnthropic(
-            model=model_name or "claude-sonnet-4-20250514",
             max_retries=5,
             timeout=DEFAULT_TIMEOUT,
         )

@@ -68,7 +68,7 @@ async def analyze_query_node(
             raw_result = json.loads(response.content)
             result = QueryAnalysis(**raw_result)
         else:
-            # OpenAI / Anthropic：使用 with_structured_output（基于 function calling）
+            # OpenAI：使用 with_structured_output（基于 function calling）
             # 这些 provider 原生支持 function calling，更可靠
             llm_with_output = llm.with_structured_output(QueryAnalysis)
             result = await llm_with_output.ainvoke(analysis_prompt)

@@ -3,8 +3,8 @@
 import asyncio
 from types import SimpleNamespace
 
-from src.config.llm_factory import resolve_provider_for_model
-from src.config.settings import resolve_llm_settings
+from src.config.llm_factory import create_llm, resolve_provider_for_model
+from src.config.settings import get_default_model_for_provider, resolve_llm_settings
 from src.deep_research.config import parse_deep_research_config
 from src.deep_research.nodes import researcher as researcher_node
 from src.deep_research.state import Section
@@ -73,6 +73,43 @@ def test_resolve_llm_settings_auto_switches_for_openrouter_full_model_name():
 
     assert settings.provider == "openrouter"
     assert settings.model_name == "openai/gpt-5"
+
+
+def test_resolve_llm_settings_keeps_deepseek_v4_on_aliyun():
+    settings = resolve_llm_settings(
+        provider_override="aliyun",
+        model_name_override="deepseek-v4-pro",
+        env={},
+    )
+
+    assert settings.provider == "aliyun"
+    assert settings.model_name == "deepseek-v4-pro"
+
+
+def test_create_aliyun_deepseek_v4_llm_uses_dashscope_key(monkeypatch):
+    monkeypatch.setenv("ALIYUN_API_KEY", "test-key")
+
+    llm = create_llm("aliyun", "deepseek-v4-flash")
+
+    assert llm.model_name == "deepseek-v4-flash"
+    assert llm.openai_api_base == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+
+def test_create_openrouter_llm_uses_settings_default(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    llm = create_llm("openrouter")
+
+    assert llm.model_name == get_default_model_for_provider("openrouter")
+
+
+def test_resolve_llm_settings_rejects_deepseek_provider():
+    try:
+        resolve_llm_settings(provider_override="deepseek", env={})
+    except ValueError as exc:
+        assert "Invalid model provider 'deepseek'" in str(exc)
+    else:
+        raise AssertionError("deepseek provider should be rejected")
 
 
 def test_compress_and_output_node_uses_runtime_config(monkeypatch):

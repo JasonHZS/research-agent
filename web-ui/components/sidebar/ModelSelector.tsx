@@ -6,7 +6,6 @@ import {
   Check,
   Cpu,
   Sparkles,
-  Brain,
   Cloud,
   Network
 } from 'lucide-react';
@@ -34,7 +33,6 @@ interface ModelSelectorProps {
 
 const PROVIDER_ICONS: Record<string, React.ElementType> = {
   openai: Sparkles,
-  anthropic: Brain,
   aliyun: Cloud,
   openrouter: Network,
 };
@@ -82,7 +80,7 @@ export const ModelSelector = memo(function ModelSelector({
 
   const displayText = `${formattedProvider}/${displayModelName}`;
 
-  const providerOrder = ['aliyun', 'anthropic', 'openai', 'openrouter'];
+  const providerOrder = ['aliyun', 'openai', 'openrouter'];
   const sortedProviders = Object.keys(modelsByProvider).sort(
     (a, b) => providerOrder.indexOf(a) - providerOrder.indexOf(b)
   );

@@ -13,24 +13,26 @@
 - **Hacker News**：通过官方 Firebase API 获取趋势与讨论数据（`src/tools/hacker_news.py`）
 - **Hugging Face 论文**：获取 Hugging Face 的日 / 周 / 月 / 趋势 AI/ML 论文列表及元数据
 - **Hugging Face 博客**：浏览官方与社区博文及元数据
-- **多模型支持**：兼容阿里云（qwen3.5-plus、qwen3-max、kimi-k2.5）、Anthropic Claude、OpenAI GPT
-- **思考模式**：部分模型可选开启思考模式（qwen3.5-plus、qwen3-max、kimi-k2.5）
+- **多模型支持**：兼容阿里云（qwen3.6-plus、kimi-k2.6、DeepSeek V4）、OpenAI GPT 和 OpenRouter
+- **思考模式**：部分阿里云模型可选开启思考模式（qwen3.6-plus、kimi-k2.6、DeepSeek V4）
 - **模块化架构**：高内聚、低耦合，便于扩展
 - **Clerk 认证**：使用 [Clerk](https://clerk.com/) 管理用户登录，Web UI 与 API 统一身份认证
 
 ## 两种研究模式
 
-| 能力 | 普通模式 | 深度研究模式 |
-|------|----------|--------------|
-| 执行方式 | 单轮 ReAct | 多轮状态机 |
-| 意图澄清 | 无 | 支持（可跳过） |
-| 查询分析 | 无 | 识别查询类型（list / comparison / deep_dive / general） |
-| 实体发现 | 无 | 「列表类」查询的前置发现 |
-| 研究规划 | 隐式 | 显式生成章节 |
-| 并行执行 | 无 | 按章节并行调研 |
-| 评审机制 | 无 | 评审节点评估证据是否充分 |
-| 上下文管理 | 累积全部消息 | 研究员层级压缩 |
-| 适用场景 | 简单问答、快速检索 | 深度调研、综合报告 |
+
+| 能力    | 普通模式      | 深度研究模式                                          |
+| ----- | --------- | ----------------------------------------------- |
+| 执行方式  | 单轮 ReAct  | 多轮状态机                                           |
+| 意图澄清  | 无         | 支持（可跳过）                                         |
+| 查询分析  | 无         | 识别查询类型（list / comparison / deep_dive / general） |
+| 实体发现  | 无         | 「列表类」查询的前置发现                                    |
+| 研究规划  | 隐式        | 显式生成章节                                          |
+| 并行执行  | 无         | 按章节并行调研                                         |
+| 评审机制  | 无         | 评审节点评估证据是否充分                                    |
+| 上下文管理 | 累积全部消息    | 研究员层级压缩                                         |
+| 适用场景  | 简单问答、快速检索 | 深度调研、综合报告                                       |
+
 
 ## 架构
 
@@ -92,11 +94,13 @@ graph TB
     Report --> Final
 ```
 
+
+
 ## 环境要求
 
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv)（推荐）或 pip
-- 阿里云 DashScope（默认）、Anthropic 或 OpenAI 的 API 密钥
+- 阿里云 DashScope（默认）、OpenAI 或 OpenRouter 的 API 密钥
 - 按需配置可选集成：Jina 或 Zyte（内容阅读器）、Tavily（网页搜索）等 — 见 `env.example`
 - Clerk 账号与密钥（使用 Web UI 时必需，见 [Clerk 用户认证](#clerk-用户认证)）
 
@@ -136,19 +140,18 @@ cp env.example .env
 # 密钥获取：https://dashscope.console.aliyun.com/
 ALIYUN_API_KEY=your-aliyun-dashscope-api-key
 
-# 可用模型：qwen3.5-plus（默认）、qwen3-max、kimi-k2.5
+# 可用模型：deepseek-v4-flash（默认）、qwen3.6-plus、kimi-k2.6、deepseek-v4-pro
 
 # 或使用其他提供商：
-# ANTHROPIC_API_KEY=your-anthropic-api-key
 # OPENAI_API_KEY=your-openai-api-key
 
 # Jina API Key（网页内容阅读）
 # 获取：https://jina.ai/
 JINA_API_KEY=your-jina-api-key
 
-# 可选模型默认值（CLI / API 请求优先级更高）
-# MODEL_PROVIDER=aliyun
-# MODEL_NAME=qwen3.5-plus
+# 可选模型默认值（CLI / API 请求优先级更高；默认仍保持阿里云）
+# MODEL_PROVIDER=aliyun  # aliyun | openai | openrouter
+# MODEL_NAME=deepseek-v4-flash
 # ENABLE_THINKING=false
 
 # 可选深度研究默认值
@@ -176,10 +179,12 @@ ENV=development uv run python -m src.api.main
 
 端口随环境变化：
 
-| 环境 | 默认端口 |
-|------|----------|
-| 开发 | 8112 |
-| 生产 | 8111 |
+
+| 环境  | 默认端口 |
+| --- | ---- |
+| 开发  | 8112 |
+| 生产  | 8111 |
+
 
 可通过环境变量覆盖：
 
@@ -220,7 +225,7 @@ npm run build && cp -r .next/static .next/standalone/.next/static
 npm run start:prod
 ```
 
-开发服务器默认 `http://localhost:3001`（生产常用 3000）。
+开发服务器默认 `http://localhost:3002`（生产常用 3000）。
 
 **注意**：前端需连接后端 API，请先启动后端。
 
@@ -233,8 +238,8 @@ Web UI 与 API 使用 [Clerk](https://clerk.com/) 作为登录与身份服务，
 1. 打开 [Clerk Dashboard](https://dashboard.clerk.com/)
 2. 创建应用或选择已有应用
 3. 在 **API Keys** 页面获取：
-   - **Publishable Key**：前端使用（`pk_` 开头）
-   - **Secret Key**：后端使用（`sk_` 开头）
+  - **Publishable Key**：前端使用（`pk_` 开头）
+  - **Secret Key**：后端使用（`sk_` 开头）
 
 #### 前端配置
 
@@ -253,7 +258,7 @@ CLERK_SECRET_KEY=sk_test_xxxx
 # Clerk 认证（保护 API 时必需）
 CLERK_SECRET_KEY=sk_test_xxxx
 # 可选：允许的前端域名（逗号分隔），默认包含 localhost 等开发地址
-# CLERK_AUTHORIZED_PARTIES=http://localhost:3000,https://your-production-domain.com
+# CLERK_AUTHORIZED_PARTIES=http://localhost:3000,http://localhost:3002,https://your-production-domain.com
 ```
 
 #### 部署说明
@@ -265,20 +270,21 @@ CLERK_SECRET_KEY=sk_test_xxxx
 ### 交互模式
 
 ```bash
-# 默认配置（阿里云 qwen3.5-plus）
+# 默认配置（阿里云 deepseek-v4-flash）
 uv run python -m src.main
 
-# 使用 kimi-k2.5
-uv run python -m src.main --model kimi-k2.5
+# 使用 kimi-k2.6
+uv run python -m src.main --model kimi-k2.6
 
 # 开启思考模式（展示推理过程）
 uv run python -m src.main --enable-thinking
-uv run python -m src.main --model kimi-k2.5 --enable-thinking
+uv run python -m src.main --model kimi-k2.6 --enable-thinking
 
-# 使用 Anthropic 或 OpenAI
-uv run python -m src.main -p anthropic
+# 使用 OpenAI 或 OpenRouter
 uv run python -m src.main -p openai
 uv run python -m src.main -p openrouter --model openai/gpt-4o
+uv run python -m src.main --model deepseek-v4-pro
+uv run python -m src.main --model deepseek-v4-flash
 ```
 
 ### 单次查询模式
@@ -308,10 +314,10 @@ uv run python -m src.main --deep-research --max-iterations 3 -q "对比 Llama 3 
 uv run python -m src.main --deep-research -v
 
 # 指定提供商
-uv run python -m src.main --deep-research -p anthropic -q "Transformer 的注意力机制演进"
+uv run python -m src.main --deep-research -p openai -q "Transformer 的注意力机制演进"
 
 # 指定模型
-uv run python -m src.main --deep-research --model kimi-k2.5 -q "LLM 推理优化技术"
+uv run python -m src.main --deep-research --model kimi-k2.6 -q "LLM 推理优化技术"
 ```
 
 深度研究参数优先级：**CLI 参数 > 环境变量 > 默认值**。  
@@ -319,6 +325,7 @@ uv run python -m src.main --deep-research --model kimi-k2.5 -q "LLM 推理优化
 允许范围：`max_iterations` 1–5、`max_concurrent` 1–10、`max_tool_calls` 1–20。
 
 **深度研究流程：**
+
 1. **澄清** — 查询模糊时追问（可跳过）
 2. **分析** — 识别查询类型并决定输出形式
 3. **发现**（仅 list 类）— 广搜发现相关实体
@@ -338,8 +345,8 @@ from src.agent.research_agent import run_research
 
 result = run_research(
     query="Summarize today's Hugging Face papers on transformers",
-    model_provider="aliyun",  # 或 "anthropic", "openai", "openrouter"
-    model_name="qwen3.5-plus",
+    model_provider="aliyun",  # 或 "openai", "openrouter"
+    model_name="deepseek-v4-flash",
     enable_thinking=True,  # 可选；部分 DashScope 模型支持
 )
 print(result)
@@ -356,7 +363,7 @@ from src.deep_research import build_deep_research_graph, run_deep_research
 async def main():
     graph = build_deep_research_graph(
         model_provider="aliyun",
-        model_name="qwen3.5-plus",
+        model_name="deepseek-v4-flash",
     )
 
     async def on_clarify(question: str) -> str:
@@ -368,7 +375,7 @@ async def main():
             "max_tool_calls": 10,
             "max_iterations": 2,
             "model_provider": "aliyun",
-            "model_name": "qwen3.5-plus",
+            "model_name": "deepseek-v4-flash",
         }
     }
 
@@ -387,12 +394,14 @@ asyncio.run(main())
 
 具体工具取决于**模式**与**运行的智能体**。下表统计本仓库注册的**业务工具**数量（名称与文件见链接文档）。
 
-| 场景 | 工具数 | 说明 |
-|------|--------|------|
-| **主智能体**（普通 / 交互） | **21** | ArXiv、HF 论文与博客、GitHub、Tavily、Zyte 文章列表、RSS 三件套、HN（Firebase） |
-| **内容阅读子智能体** | **2** | GitHub README + **一种** URL 阅读器（`jina` 或 `zyte`） |
-| **深度研究 — 研究员 / 发现** | **22** | 20 个研究工具 + `research_complete` + `think`（图中无 RSS） |
-| **深度研究 — 澄清节点** | **1** | 仅 `tavily_search_tool` |
+
+| 场景                  | 工具数    | 说明                                                          |
+| ------------------- | ------ | ----------------------------------------------------------- |
+| **主智能体**（普通 / 交互）   | **21** | ArXiv、HF 论文与博客、GitHub、Tavily、Zyte 文章列表、RSS 三件套、HN（Firebase） |
+| **内容阅读子智能体**        | **2**  | GitHub README + **一种** URL 阅读器（`jina` 或 `zyte`）             |
+| **深度研究 — 研究员 / 发现** | **22** | 20 个研究工具 + `research_complete` + `think`（图中无 RSS）           |
+| **深度研究 — 澄清节点**     | **1**  | 仅 `tavily_search_tool`                                      |
+
 
 主智能体基于 **DeepAgents**，还会注入框架工具（如 `write_todos`、虚拟文件、`task` 委派子智能体等），**不计入**上表。
 
@@ -405,10 +414,12 @@ asyncio.run(main())
 CONTENT_READER_TYPE=zyte
 ```
 
-| 阅读器 | 说明 | 成本 |
-|--------|------|------|
-| Jina | 网页转 Markdown | 有免费档 |
-| Zyte | 结构化正文（标题、作者、正文等） | 付费 |
+
+| 阅读器  | 说明               | 成本   |
+| ---- | ---------------- | ---- |
+| Jina | 网页转 Markdown     | 有免费档 |
+| Zyte | 结构化正文（标题、作者、正文等） | 付费   |
+
 
 ## 示例查询
 

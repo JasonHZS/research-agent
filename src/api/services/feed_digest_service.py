@@ -38,7 +38,7 @@ def _clean_summary(raw: str, max_len: int = 200) -> str | None:
 
 
 def _translate_summaries_sync(items: list[FeedDigestItem]) -> None:
-    """Batch-translate titles and summaries to Chinese using qwen3.5-plus.
+    """Batch-translate titles and summaries to Chinese using deepseek-v4-flash.
 
     Mutates items in-place, setting ``latest_title_zh`` and ``latest_summary_zh``.
     Best-effort: on any failure the items are left untouched.
@@ -65,7 +65,7 @@ def _translate_summaries_sync(items: list[FeedDigestItem]) -> None:
     try:
         from src.config.llm_factory import create_llm
 
-        llm = create_llm(model_provider="aliyun", model_name="qwen3.5-plus")
+        llm = create_llm(model_provider="aliyun", model_name="deepseek-v4-flash")
         response = llm.invoke(prompt)
         content = response.content if hasattr(response, "content") else str(response)
     except Exception:

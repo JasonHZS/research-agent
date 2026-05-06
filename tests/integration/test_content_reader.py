@@ -44,7 +44,7 @@ async def run_content_reader_test(
 
     Args:
         query: The query to send to the content reader.
-        model_provider: LLM provider ('aliyun', 'anthropic', or 'openai').
+        model_provider: LLM provider ('aliyun', 'openai', or 'openrouter').
         model_name: Specific model name.
         verbose: Enable verbose output with tool calls.
     """
@@ -132,7 +132,7 @@ def main():
         "--model-provider",
         type=str,
         default="aliyun",
-        choices=["aliyun", "anthropic", "openai"],
+        choices=["aliyun", "openai", "openrouter"],
         help="LLM provider to use (default: aliyun)",
     )
     parser.add_argument(
@@ -140,7 +140,7 @@ def main():
         "--model-name",
         type=str,
         default=None,
-        help="Model name (e.g., 'qwen3.5-plus', 'kimi-k2.5')",
+        help="Model name (e.g., 'qwen3.6-plus', 'kimi-k2.6', 'deepseek-v4-flash')",
     )
 
     # Output options

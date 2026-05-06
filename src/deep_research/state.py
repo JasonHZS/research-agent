@@ -246,7 +246,7 @@ class DeepResearchConfig(BaseModel):
 
     # 模型设置 (运行时解析)
     model_provider: str = "aliyun"
-    model_name: Optional[str] = "qwen3.5-plus"
+    model_name: Optional[str] = "deepseek-v4-flash"
     enable_thinking: bool = False
 
     # 调试/显示

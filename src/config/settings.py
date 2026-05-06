@@ -19,11 +19,10 @@ ENV_MODEL_PROVIDER = "MODEL_PROVIDER"
 ENV_MODEL_NAME = "MODEL_NAME"
 ENV_ENABLE_THINKING = "ENABLE_THINKING"
 
-ALLOWED_PROVIDERS = {"aliyun", "anthropic", "openai", "openrouter"}
+ALLOWED_PROVIDERS = {"aliyun", "openai", "openrouter"}
 DEFAULT_MODEL_PROVIDER = "aliyun"
 DEFAULT_MODEL_NAME_BY_PROVIDER = {
-    "aliyun": "qwen3.5-plus",
-    "anthropic": "claude-sonnet-4-20250514",
+    "aliyun": "deepseek-v4-flash",
     "openai": "gpt-4o",
     "openrouter": "openai/gpt-5",
 }
@@ -64,8 +63,8 @@ ENV_CLERK_AUTHORIZED_PARTIES = "CLERK_AUTHORIZED_PARTIES"
 DEFAULT_CLERK_AUTHORIZED_PARTIES = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
     "http://localhost:5173",
 ]
 

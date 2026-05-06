@@ -71,7 +71,7 @@ function createStoreState() {
   return {
     sessionId: 'session-1',
     currentModelProvider: 'aliyun',
-    currentModelName: 'qwen3.5-plus',
+    currentModelName: 'deepseek-v4-flash',
     currentMessages: [],
     streamingMessage: null,
     isLoading: false,

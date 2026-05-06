@@ -13,24 +13,26 @@ A deep research agent built with LangGraph, LangChain, and DeepAgents, using nat
 - **Hacker News Integration**: Trending and discussion data via the official Hacker News Firebase API (`src/tools/hacker_news.py`)
 - **Hugging Face Papers**: Fetch daily / weekly / monthly / trending AI/ML paper lists from Hugging Face with metadata
 - **Hugging Face Blog**: Browse official and community blog posts with metadata
-- **Multi-LLM Support**: Works with Aliyun (qwen3.5-plus, qwen3-max, kimi-k2.5), Anthropic Claude, and OpenAI GPT
-- **Thinking Mode**: Optional thinking mode for supported models (qwen3.5-plus, qwen3-max, kimi-k2.5)
+- **Multi-LLM Support**: Works with Aliyun (qwen3.6-plus, kimi-k2.6, DeepSeek V4), OpenAI GPT, and OpenRouter
+- **Thinking Mode**: Optional thinking mode for supported Aliyun models (qwen3.6-plus, kimi-k2.6, DeepSeek V4)
 - **Modular Architecture**: High cohesion, low coupling design for easy extension
 - **Clerk Authentication**: Uses [Clerk](https://clerk.com/) for user sign-in; unified auth for Web UI and API
 
 ## Two Research Modes
 
-| Feature | Normal Mode | Deep Research Mode |
-|---------|-------------|-------------------|
-| Execution | Single-turn ReAct | Multi-turn state machine |
-| Intent Clarification | None | Supported (skippable) |
-| Query Analysis | None | Identifies query type (list/comparison/deep_dive/general) |
-| Entity Discovery | None | Pre-research discovery for "list" queries |
-| Research Planning | Implicit | Explicit section generation |
-| Parallel Execution | None | Section-based parallel research |
-| Review Mechanism | None | Review node evaluates evidence sufficiency |
-| Context Management | Accumulates all messages | Researcher-level compression |
-| Use Case | Simple queries, quick lookups | In-depth research, comprehensive reports |
+
+| Feature              | Normal Mode                   | Deep Research Mode                                        |
+| -------------------- | ----------------------------- | --------------------------------------------------------- |
+| Execution            | Single-turn ReAct             | Multi-turn state machine                                  |
+| Intent Clarification | None                          | Supported (skippable)                                     |
+| Query Analysis       | None                          | Identifies query type (list/comparison/deep_dive/general) |
+| Entity Discovery     | None                          | Pre-research discovery for "list" queries                 |
+| Research Planning    | Implicit                      | Explicit section generation                               |
+| Parallel Execution   | None                          | Section-based parallel research                           |
+| Review Mechanism     | None                          | Review node evaluates evidence sufficiency                |
+| Context Management   | Accumulates all messages      | Researcher-level compression                              |
+| Use Case             | Simple queries, quick lookups | In-depth research, comprehensive reports                  |
+
 
 ## Architecture
 
@@ -92,11 +94,13 @@ graph TB
     Report --> Final
 ```
 
+
+
 ## Prerequisites
 
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip
-- API key for Aliyun DashScope (default), Anthropic, or OpenAI
+- API key for Aliyun DashScope (default), OpenAI, or OpenRouter
 - Keys for optional integrations as needed: Jina or Zyte (content reader), Tavily (web search), etc. — see `env.example`
 - Clerk account and keys (required when using the Web UI; see [Clerk authentication](#clerk-authentication))
 
@@ -136,19 +140,18 @@ Edit `.env` and add your API keys:
 # Get your key from: https://dashscope.console.aliyun.com/
 ALIYUN_API_KEY=your-aliyun-dashscope-api-key
 
-# Available models: qwen3.5-plus (default), qwen3-max, kimi-k2.5
+# Available models: deepseek-v4-flash (default), qwen3.6-plus, kimi-k2.6, deepseek-v4-pro
 
 # Or use alternative providers:
-# ANTHROPIC_API_KEY=your-anthropic-api-key
 # OPENAI_API_KEY=your-openai-api-key
 
 # Jina API Key (for web content reading)
 # Get your key from: https://jina.ai/
 JINA_API_KEY=your-jina-api-key
 
-# Optional model defaults (CLI / API request has higher priority)
-# MODEL_PROVIDER=aliyun
-# MODEL_NAME=qwen3.5-plus
+# Optional model defaults (CLI / API request has higher priority; defaults stay on Aliyun)
+# MODEL_PROVIDER=aliyun  # aliyun | openai | openrouter
+# MODEL_NAME=deepseek-v4-flash
 # ENABLE_THINKING=false
 
 # Optional Deep Research defaults
@@ -176,10 +179,12 @@ ENV=development uv run python -m src.api.main
 
 The API service port depends on the environment:
 
+
 | Environment | Default Port |
-|-------------|-------------|
-| Development | 8112 |
-| Production  | 8111 |
+| ----------- | ------------ |
+| Development | 8112         |
+| Production  | 8111         |
+
 
 You can override via environment variables:
 
@@ -202,7 +207,6 @@ ENV=production LOG_FILE=/path/to/your/app.log \
   uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8111  # Production uses 8111
 ```
 
-
 ### Starting the Frontend UI
 
 The frontend is built with Next.js and located in the `web-ui/` directory.
@@ -222,7 +226,7 @@ npm run build && cp -r .next/static .next/standalone/.next/static
 npm run start:prod
 ```
 
-The frontend development server runs on `http://localhost:3001` by default (production uses port 3000).
+The frontend development server runs on `http://localhost:3002` by default (production uses port 3000).
 
 **Important**: The frontend needs to connect to the backend API, so make sure the backend service is running first.
 
@@ -235,8 +239,8 @@ The Web UI and API use [Clerk](https://clerk.com/) for sign-in and unified ident
 1. Open the [Clerk Dashboard](https://dashboard.clerk.com/)
 2. Create an application or select an existing one
 3. On the **API Keys** page, copy:
-   - **Publishable Key** — frontend (`pk_…`)
-   - **Secret Key** — backend (`sk_…`)
+  - **Publishable Key** — frontend (`pk_…`)
+  - **Secret Key** — backend (`sk_…`)
 
 #### Frontend configuration
 
@@ -255,7 +259,7 @@ Add to the project root `.env`:
 # Clerk Authentication (required for API protection)
 CLERK_SECRET_KEY=sk_test_xxxx
 # Optional: comma-separated allowed frontend origins (defaults include localhost dev URLs)
-# CLERK_AUTHORIZED_PARTIES=http://localhost:3000,https://your-production-domain.com
+# CLERK_AUTHORIZED_PARTIES=http://localhost:3000,http://localhost:3002,https://your-production-domain.com
 ```
 
 #### Deployment notes
@@ -267,20 +271,21 @@ In production with Next.js standalone mode, ensure Clerk env vars are loaded (e.
 ### Interactive Mode
 
 ```bash
-# Run with default settings (Aliyun qwen3.5-plus)
+# Run with default settings (Aliyun deepseek-v4-flash)
 uv run python -m src.main
 
-# Use kimi-k2.5 model
-uv run python -m src.main --model kimi-k2.5
+# Use kimi-k2.6 model
+uv run python -m src.main --model kimi-k2.6
 
 # Enable thinking mode (shows model's reasoning process)
 uv run python -m src.main --enable-thinking
-uv run python -m src.main --model kimi-k2.5 --enable-thinking
+uv run python -m src.main --model kimi-k2.6 --enable-thinking
 
-# Use Anthropic or OpenAI instead
-uv run python -m src.main -p anthropic
+# Use OpenAI or OpenRouter instead
 uv run python -m src.main -p openai
 uv run python -m src.main -p openrouter --model openai/gpt-4o
+uv run python -m src.main --model deepseek-v4-pro
+uv run python -m src.main --model deepseek-v4-flash
 ```
 
 ### Single Query Mode
@@ -310,10 +315,10 @@ uv run python -m src.main --deep-research --max-iterations 3 -q "Compare the tec
 uv run python -m src.main --deep-research -v
 
 # Specify LLM provider
-uv run python -m src.main --deep-research -p anthropic -q "Evolution of attention mechanisms in Transformers"
+uv run python -m src.main --deep-research -p openai -q "Evolution of attention mechanisms in Transformers"
 
 # Use a specific model
-uv run python -m src.main --deep-research --model kimi-k2.5 -q "Latest techniques for LLM inference optimization"
+uv run python -m src.main --deep-research --model kimi-k2.6 -q "Latest techniques for LLM inference optimization"
 ```
 
 Deep Research parameter precedence: **CLI arguments > environment variables > defaults**.  
@@ -321,6 +326,7 @@ Defaults: `max_iterations=2`, `max_concurrent=5`, `max_tool_calls=10`.
 Allowed ranges: `max_iterations` 1–5, `max_concurrent` 1–10, `max_tool_calls` 1–20.
 
 **Deep Research Flow:**
+
 1. **Clarify** - Asks clarifying questions if the query is ambiguous (can be skipped)
 2. **Analyze** - Identifies query type (list/comparison/deep_dive/general) and determines output format
 3. **Discover** (list queries only) - Performs broad search to discover all relevant entities before deep research
@@ -329,7 +335,7 @@ Allowed ranges: `max_iterations` 1–5, `max_concurrent` 1–10, `max_tool_calls
 6. **Review** - Evaluates evidence sufficiency across all sections
 7. **Iterate or Report** - If gaps exist, re-research specific sections; otherwise generate final report
 
-For detailed architecture documentation, see [`src/deep_research/README.md`](src/deep_research/README.md).
+For detailed architecture documentation, see `[src/deep_research/README.md](src/deep_research/README.md)`.
 
 ### Programmatic Usage
 
@@ -340,8 +346,8 @@ from src.agent.research_agent import run_research
 
 result = run_research(
     query="Summarize today's Hugging Face papers on transformers",
-    model_provider="aliyun",  # or "anthropic", "openai", "openrouter"
-    model_name="qwen3.5-plus",
+    model_provider="aliyun",  # or "openai", "openrouter"
+    model_name="deepseek-v4-flash",
     enable_thinking=True,  # optional; supported on some DashScope models
 )
 print(result)
@@ -359,7 +365,7 @@ async def main():
     # Build the deep research graph (tools are assembled inside the graph)
     graph = build_deep_research_graph(
         model_provider="aliyun",
-        model_name="qwen3.5-plus",
+        model_name="deepseek-v4-flash",
     )
 
     # Define clarification callback (optional)
@@ -374,7 +380,7 @@ async def main():
             "max_tool_calls": 10,
             "max_iterations": 2,
             "model_provider": "aliyun",
-            "model_name": "qwen3.5-plus",
+            "model_name": "deepseek-v4-flash",
         }
     }
 
@@ -394,12 +400,14 @@ asyncio.run(main())
 
 Configured tools depend on **mode** and **which agent** is running. The table below counts **business tools** registered in this repo (exact names and source files are in the linked doc).
 
-| Context | # of tools | What it covers |
-|---------|------------|----------------|
-| **Main agent** (normal / interactive mode) | **21** | ArXiv, Hugging Face papers & blog, GitHub search, Tavily, Zyte article list, RSS trio, Hacker News (Firebase API) |
-| **Content reader subagent** | **2** | GitHub README fetch + **one** URL reader (`jina` or `zyte`, see below) |
-| **Deep Research — researcher / discover** | **22** | 20 research tools + `research_complete` + `think` (no RSS tools in this graph) |
-| **Deep Research — clarify node** | **1** | `tavily_search_tool` only |
+
+| Context                                    | # of tools | What it covers                                                                                                    |
+| ------------------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Main agent** (normal / interactive mode) | **21**     | ArXiv, Hugging Face papers & blog, GitHub search, Tavily, Zyte article list, RSS trio, Hacker News (Firebase API) |
+| **Content reader subagent**                | **2**      | GitHub README fetch + **one** URL reader (`jina` or `zyte`, see below)                                            |
+| **Deep Research — researcher / discover**  | **22**     | 20 research tools + `research_complete` + `think` (no RSS tools in this graph)                                    |
+| **Deep Research — clarify node**           | **1**      | `tavily_search_tool` only                                                                                         |
+
 
 The main agent is built with **DeepAgents**, which also injects framework tools (e.g. `write_todos`, virtual filesystem helpers, `task` to delegate to subagents). Those are not part of the counts above.
 
@@ -412,10 +420,12 @@ The main agent is built with **DeepAgents**, which also injects framework tools 
 CONTENT_READER_TYPE=zyte
 ```
 
-| Reader | Description | Cost |
-|--------|-------------|------|
-| Jina | Converts web pages to markdown | Free tier available |
-| Zyte | Structured article extraction (title, author, body) | Paid |
+
+| Reader | Description                                         | Cost                |
+| ------ | --------------------------------------------------- | ------------------- |
+| Jina   | Converts web pages to markdown                      | Free tier available |
+| Zyte   | Structured article extraction (title, author, body) | Paid                |
+
 
 ## Example Queries
 
@@ -488,3 +498,4 @@ MIT License - See [LICENSE](LICENSE) for details.
 - [Hugging Face](https://huggingface.co/) - Daily, weekly, monthly, trending papers and blog source
 - [Jina AI](https://jina.ai/) - Web content reader
 - [Clerk](https://clerk.com/) - User sign-in and identity
+

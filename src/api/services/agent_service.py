@@ -4,8 +4,8 @@ import asyncio
 import json
 import time
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass, field
 from contextlib import suppress
+from dataclasses import dataclass, field
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -27,7 +27,10 @@ from src.api.schemas.chat import (
     ToolCall,
     ToolCallStatus,
 )
-from src.config.llm_factory import ALIYUN_MODELS, OPENROUTER_MODELS
+from src.config.llm_factory import (
+    ALIYUN_MODELS,
+    OPENROUTER_MODELS,
+)
 from src.config.settings import resolve_runtime_settings
 from src.deep_research.graph import build_deep_research_graph
 from src.deep_research.state import ClarificationStatus, Section
@@ -1357,12 +1360,19 @@ class AgentService:
                     provider="aliyun",
                     name=name,
                     display_name=f"Aliyun {name}",
-                    supports_thinking=name in ["qwen3-max", "qwen3.5-plus", "kimi-k2.5", "glm-5"],
+                    supports_thinking=name
+                    in [
+                        "qwen3.6-plus",
+                        "kimi-k2.6",
+                        "glm-5.1",
+                        "deepseek-v4-pro",
+                        "deepseek-v4-flash",
+                    ],
                 )
             )
 
         # OpenRouter models
-        for alias, full_name in OPENROUTER_MODELS.items():
+        for _alias, full_name in OPENROUTER_MODELS.items():
             # 从完整模型名提取显示名称，如 "openai/gpt-5" -> "GPT-5"
             model_display = full_name.split("/")[-1]
             models.append(

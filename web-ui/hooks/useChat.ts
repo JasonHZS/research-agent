@@ -101,7 +101,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   currentMessages: [],
   models: [],
   currentModelProvider: 'aliyun',
-  currentModelName: 'qwen3.5-plus',
+  currentModelName: 'deepseek-v4-flash',
   isDeepResearch: false,
   canToggleDeepResearch: true,
   streamingMessage: null,

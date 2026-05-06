@@ -134,7 +134,7 @@ function parseSseFrame(frame: string): StreamEvent | null {
  * @param sessionId - The session/conversation ID
  * @param message - The user message to send
  * @param modelProvider - The model provider (e.g., 'aliyun')
- * @param modelName - The model name (e.g., 'qwen3.5-plus')
+ * @param modelName - The model name (e.g., 'deepseek-v4-flash')
  * @param config - Event handlers for stream events
  * @param signal - Optional AbortSignal for cancellation
  */

@@ -188,13 +188,13 @@ async def main(
 
     Args:
         query: Research query to execute. If None, runs in interactive mode.
-        model_provider: LLM provider ('aliyun', 'anthropic', or 'openai'). Resolved from
-                       CLI > env MODEL_PROVIDER > default ('aliyun').
-        model_name: Specific model name (e.g., 'qwen3.5-plus', 'kimi-k2.5'). Resolved
+        model_provider: LLM provider ('aliyun', 'openai', or 'openrouter').
+                       Resolved from CLI > env MODEL_PROVIDER > default ('aliyun').
+        model_name: Specific model name (e.g., 'qwen3.6-plus', 'kimi-k2.6'). Resolved
                     from CLI > env MODEL_NAME > provider defaults.
         verbose: If True, prints detailed execution logs including tool calls.
         enable_thinking: If True, enables thinking mode for supported models
-                        (e.g., qwen3-max, kimi-k2.5 via DashScope).
+                        (e.g., qwen3.6-plus, kimi-k2.6, DeepSeek V4 via DashScope).
                         Resolved from CLI > env ENABLE_THINKING > default (False).
         deep_research: If True, runs in Deep Research mode with supervisor-researcher
                       multi-agent architecture.
@@ -232,11 +232,6 @@ async def main(
             print("Error: ALIYUN_API_KEY or DASHSCOPE_API_KEY environment variable not set")
             print("Please set it in your .env file or environment")
             sys.exit(1)
-    elif resolved_provider == "anthropic" and not os.getenv("ANTHROPIC_API_KEY"):
-        logger.error("Missing API key", provider="anthropic")
-        print("Error: ANTHROPIC_API_KEY environment variable not set")
-        print("Please set it in your .env file or environment")
-        sys.exit(1)
     elif resolved_provider == "openai" and not os.getenv("OPENAI_API_KEY"):
         logger.error("Missing API key", provider="openai")
         print("Error: OPENAI_API_KEY environment variable not set")
@@ -247,7 +242,6 @@ async def main(
         print("Error: OPENROUTER_API_KEY environment variable not set")
         print("Please set it in your .env file or environment")
         sys.exit(1)
-
     resolved_max_iterations = runtime_settings.deep_research.max_iterations
     resolved_max_concurrent = runtime_settings.deep_research.max_concurrent
     resolved_max_tool_calls = runtime_settings.deep_research.max_tool_calls
@@ -257,8 +251,15 @@ async def main(
     mode_str = "Deep Research Mode" if deep_research else "Research Agent"
     print(f"{mode_str} - Powered by {'LangGraph' if deep_research else 'DeepAgents'}")
     thinking_str = " | Thinking: ON" if resolved_enable_thinking else ""
-    deep_str = f" | Max Iter: {resolved_max_iterations} | Concurrent: {resolved_max_concurrent}" if deep_research else ""
-    print(f"Provider: {resolved_provider} | Model: {resolved_model_name or 'default'}{thinking_str}{deep_str}")
+    deep_str = (
+        f" | Max Iter: {resolved_max_iterations} | Concurrent: {resolved_max_concurrent}"
+        if deep_research
+        else ""
+    )
+    print(
+        f"Provider: {resolved_provider} | Model: {resolved_model_name or 'default'}"
+        f"{thinking_str}{deep_str}"
+    )
     print("=" * 60)
 
     logger.info(
@@ -383,7 +384,10 @@ def run_cli() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Research Agent - Deep research with native API tools and optional Deep Research graph mode"
+        description=(
+            "Research Agent - Deep research with native API tools and optional "
+            "Deep Research graph mode"
+        )
     )
     parser.add_argument(
         "-q", "--query",
@@ -394,14 +398,17 @@ def run_cli() -> None:
         "-p", "--model-provider",
         type=str,
         default=None,
-        choices=["aliyun", "anthropic", "openai", "openrouter"],
+        choices=["aliyun", "openai", "openrouter"],
         help="LLM provider to use (default: env MODEL_PROVIDER or 'aliyun')",
     )
     parser.add_argument(
         "--model",
         type=str,
         default=None,
-        help="Model name to use (default: env MODEL_NAME or provider default; e.g., 'qwen3.5-plus', 'kimi-k2.5', 'glm-5' for aliyun)",
+        help=(
+            "Model name to use (default: env MODEL_NAME or provider default; "
+            "e.g., 'qwen3.6-plus' or 'deepseek-v4-flash' for aliyun)"
+        ),
     )
     parser.add_argument(
         "-v", "--verbose",

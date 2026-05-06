@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -29,8 +29,8 @@ python -m src.main --query "What are the latest LLM papers?"
 
 # Use different providers
 python -m src.main -p openai     # Use GPT
-python -m src.main --model deepseek-v4-flash  # Use DeepSeek via Aliyun
-python -m src.main --model kimi-k2.6  # Use Kimi model
+python -m src.main -p openrouter --model openai/gpt-5  # Use OpenRouter
+python -m src.main --model kimi-k2.6  # Use Kimi via Aliyun
 
 # Verbose mode (shows tool calls and agent steps)
 python -m src.main -v

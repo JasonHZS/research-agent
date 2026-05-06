@@ -420,7 +420,7 @@ START → researcher_invoke → tools → [循环或完成] → compress_output 
 |------|------|
 | `--deep-research` | 启用 Deep Research 模式 |
 | `--max-iterations N` | 设置最大 Review 迭代轮数（1-5） |
-| `-p, --model-provider` | 指定 LLM 提供商（aliyun/anthropic/openai/openrouter） |
+| `-p, --model-provider` | 指定 LLM 提供商（aliyun/openai/openrouter） |
 | `--model` | 指定具体模型名称 |
 | `-v, --verbose` | 启用详细日志 |
 
@@ -442,10 +442,10 @@ python -m src.main --deep-research --max-iterations 3 -q "对比 Llama 3 和 GPT
 python -m src.main --deep-research -v
 
 # 指定 LLM Provider
-python -m src.main --deep-research -p anthropic -q "Transformer 的注意力机制演进"
+python -m src.main --deep-research -p openai -q "Transformer 的注意力机制演进"
 
 # 使用特定模型
-python -m src.main --deep-research --model kimi-k2.5 -q "LLM 推理优化技术"
+python -m src.main --deep-research --model kimi-k2.6 -q "LLM 推理优化技术"
 ```
 
 ### 编程调用
@@ -459,7 +459,7 @@ from src.deep_research import build_deep_research_graph, run_deep_research
 # 构建 Graph（内部通过 get_all_research_tools() 组装工具）
 graph = build_deep_research_graph(
     model_provider="aliyun",
-    model_name="qwen3.5-plus",
+    model_name="deepseek-v4-flash",
 )
 
 # 定义澄清回调（可选）
@@ -474,7 +474,7 @@ config = {
         "max_tool_calls": 10,
         "max_iterations": 2,
         "model_provider": "aliyun",
-        "model_name": "qwen3.5-plus",
+        "model_name": "deepseek-v4-flash",
     }
 }
 

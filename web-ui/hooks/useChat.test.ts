@@ -9,7 +9,7 @@ describe('useChatStore todo sidebar state', () => {
       currentMessages: [],
       models: [],
       currentModelProvider: 'aliyun',
-      currentModelName: 'qwen3.5-plus',
+      currentModelName: 'deepseek-v4-flash',
       isDeepResearch: false,
       canToggleDeepResearch: true,
       streamingMessage: null,
