@@ -86,7 +86,13 @@ class BackgroundRunner:
                     run.terminal_event = event
                 await self._broadcast_to_subscribers(run, event)
         except asyncio.CancelledError:
-            run.snapshot.error = "Run was cancelled"
+            cancel_event = StreamEvent(
+                type=StreamEventType.ERROR,
+                data={"message": "Run was cancelled"},
+            )
+            apply_event_to_snapshot(run.snapshot, cancel_event)
+            run.terminal_event = cancel_event
+            await self._broadcast_to_subscribers(run, cancel_event)
             raise
         except Exception as run_error:
             self._logger.exception(
@@ -167,6 +173,11 @@ class BackgroundRunner:
         if run is None:
             raise ValueError(f"No background run found for conversation {conversation_id}")
 
+        # The SNAPSHOT event below carries the *full* accumulated state
+        # (content, segments, tool_calls, ...), so it doubles as the
+        # recovery payload if the producer finishes between the is_running
+        # check and the queue registration below. Any in-flight live events
+        # missed by the subscriber are already represented in the snapshot.
         queue: asyncio.Queue = asyncio.Queue()
         if run.snapshot.is_running:
             run.subscribers.add(queue)

@@ -22,22 +22,42 @@ def format_tool_result(content: Any, max_len: int = 500) -> str:
 
 
 def is_error_result(result: str) -> bool:
-    """Check if a tool result indicates an error."""
+    """Check if a tool result indicates an error.
+
+    Uses tight, position-aware matching to avoid false positives on benign
+    text that merely *mentions* error words (e.g. "2 papers not found in
+    arXiv" or a code snippet discussing `try/except`). Only the first
+    ~200 chars are inspected so a long body that happens to contain
+    "Error: ..." deep inside doesn't flip an otherwise successful result.
+    """
     if not result:
         return False
-    result_lower = result.lower()
-    error_indicators = [
+
+    head = result.strip().lower()[:200]
+    if not head:
+        return False
+
+    prefix_indicators = (
         "error",
         "failed",
         "exception",
+        "traceback",
         "timeout",
+    )
+    if any(head.startswith(p) for p in prefix_indicators):
+        return True
+
+    marker_indicators = (
+        "error:",
+        "exception:",
+        "failed:",
+        "[error]",
         "connection refused",
-        "not found",
-        "unauthorized",
-        "forbidden",
-        "rate limit",
-    ]
-    return any(indicator in result_lower for indicator in error_indicators)
+        "rate limit exceeded",
+        "401 unauthorized",
+        "403 forbidden",
+    )
+    return any(marker in head for marker in marker_indicators)
 
 
 def is_stream_disconnect_error(exc: Exception) -> bool:
