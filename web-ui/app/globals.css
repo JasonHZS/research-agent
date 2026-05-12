@@ -105,12 +105,22 @@
     padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
   }
 
+  .safe-pb-feed-mobile {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
   .safe-pb-mobile-inset {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .safe-bottom-4 {
     bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (min-width: 640px) {
+    .safe-pb-feed-mobile {
+      padding-bottom: 112px;
+    }
   }
 
   @media (min-width: 768px) {
@@ -131,18 +141,37 @@
 /* Markdown content styles */
 .markdown-content {
   @apply text-foreground leading-relaxed;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Defensive: any long token (URLs, English words mixed with CJK, model names like
+   "deepseek-v4-flash") must be allowed to break, otherwise the line box gets
+   pushed wider than the viewport and ALL siblings rewrap to that overflowed
+   width. `anywhere` is stronger than `break-word` because the breakpoints also
+   participate in min-content calculation. */
+.markdown-content p,
+.markdown-content li,
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content blockquote,
+.markdown-content a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown-content h1 {
-  @apply text-3xl font-bold mt-6 mb-4;
+  @apply text-2xl sm:text-3xl font-bold mt-5 sm:mt-6 mb-3 sm:mb-4;
 }
 
 .markdown-content h2 {
-  @apply text-2xl font-bold mt-5 mb-4;
+  @apply text-xl sm:text-2xl font-bold mt-4 sm:mt-5 mb-3 sm:mb-4;
 }
 
 .markdown-content h3 {
-  @apply text-xl font-semibold mt-4 mb-3;
+  @apply text-lg sm:text-xl font-semibold mt-3 sm:mt-4 mb-2 sm:mb-3;
 }
 
 .markdown-content p {
@@ -157,7 +186,7 @@
 
 .markdown-content ul,
 .markdown-content ol {
-  @apply mb-4 pl-6;
+  @apply mb-4 pl-5 sm:pl-6;
 }
 
 .markdown-content ul {
@@ -190,7 +219,8 @@
 
 .markdown-content th,
 .markdown-content td {
-  @apply border border-border px-3 py-2 text-left;
+  @apply border border-border px-2 py-1.5 sm:px-3 sm:py-2 text-left align-top;
+  word-break: break-word;
 }
 
 .markdown-content th {
@@ -212,7 +242,7 @@
 
 /* Code block styles */
 .markdown-content pre {
-  @apply bg-muted rounded-lg p-4 overflow-x-auto my-4 text-sm;
+  @apply bg-muted rounded-lg p-3 sm:p-4 overflow-x-auto my-4 text-xs sm:text-sm max-w-full;
 }
 
 .markdown-content code {

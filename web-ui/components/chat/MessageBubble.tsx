@@ -94,7 +94,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ content, attachedFee
           </p>
         </a>
       )}
-      <div className="rounded-2xl px-4 py-2.5 bg-primary text-primary-foreground rounded-br-md break-words">
+      <div className="rounded-2xl px-3.5 py-2 sm:px-4 sm:py-2.5 bg-primary text-primary-foreground rounded-br-md break-words text-[15px] sm:text-base leading-relaxed">
         <p className="whitespace-pre-wrap">{content}</p>
       </div>
       {/* Copy button - appears on hover */}
@@ -175,8 +175,8 @@ const SegmentRenderer = memo(function SegmentRenderer({
   
   // Text segment
   return (
-    <div className="w-full break-words">
-      <div className="prose-container">
+    <div className="w-full min-w-0 max-w-full break-words">
+      <div className="prose-container min-w-0 max-w-full">
         <MarkdownRenderer content={segment.content} />
         {/* Blinking cursor - inline at end of text */}
         {showCursor && (
@@ -219,7 +219,7 @@ export const MessageBubble = memo(function MessageBubble({
       <div
         className={cn(
           'flex flex-col gap-2 min-w-0',
-          isUser ? 'items-end max-w-[80%]' : 'items-start w-full'
+          isUser ? 'items-end max-w-[88%] sm:max-w-[80%]' : 'items-start w-full'
         )}
       >
         {/* Interleaved segments rendering */}
@@ -239,8 +239,8 @@ export const MessageBubble = memo(function MessageBubble({
               <ToolCallPanel toolCalls={message.tool_calls} className="w-full" />
             )}
             {/* Message content */}
-            <div className="w-full break-words">
-              <div className="prose-container">
+            <div className="w-full min-w-0 max-w-full break-words">
+              <div className="prose-container min-w-0 max-w-full">
                 <MarkdownRenderer content={message.content} />
                 {isStreaming && (
                   <span className="inline-block w-2 h-4 bg-primary ml-0.5 cursor-blink" />
@@ -348,8 +348,8 @@ export const StreamingMessageBubble = memo(function StreamingMessageBubble({
 
             {/* Message bubble */}
             {(content || toolCalls.length === 0) && (
-              <div className="w-full break-words">
-                <div className="prose-container">
+              <div className="w-full min-w-0 max-w-full break-words">
+                <div className="prose-container min-w-0 max-w-full">
                   {content ? (
                     <MarkdownRenderer content={content} />
                   ) : (

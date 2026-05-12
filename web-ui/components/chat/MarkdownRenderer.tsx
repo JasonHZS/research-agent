@@ -70,7 +70,7 @@ function CustomLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-primary underline underline-offset-2 hover:text-primary/80"
+      className="text-primary underline underline-offset-2 hover:text-primary/80 [overflow-wrap:anywhere] break-all"
       {...props}
     >
       {children}
@@ -81,8 +81,8 @@ function CustomLink({
 // Custom table wrapper for horizontal scroll
 function TableWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto my-4">
-      <table className="w-full border-collapse">{children}</table>
+    <div className="overflow-x-auto max-w-full my-4 -mx-1 px-1">
+      <table className="w-full border-collapse text-sm">{children}</table>
     </div>
   );
 }
@@ -93,7 +93,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
 }: MarkdownRendererProps) {
   return (
     <ReactMarkdown
-      className={cn('markdown-content', className)}
+      className={cn('markdown-content min-w-0 max-w-full', className)}
       remarkPlugins={[remarkGfm, remarkMath]}
       rehypePlugins={[rehypeHighlight, rehypeKatex, rehypeRaw]}
       components={{

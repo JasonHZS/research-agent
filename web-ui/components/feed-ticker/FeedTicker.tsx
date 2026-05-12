@@ -52,7 +52,7 @@ function FeedCard({ item, lang }: { item: FeedDigestItem; lang: 'zh' | 'en' }) {
         e.dataTransfer.setData('application/feed-card', JSON.stringify(item));
         e.dataTransfer.effectAllowed = 'copy';
       }}
-      className="group relative flex h-[96px] w-[360px] flex-shrink-0 flex-col justify-between overflow-hidden rounded-xl border border-border bg-card/80 px-3.5 py-2.5 shadow-sm backdrop-blur transition-colors hover:border-orange-500/30 hover:bg-orange-500/5"
+      className="group relative flex h-[80px] w-[260px] sm:h-[96px] sm:w-[360px] flex-shrink-0 flex-col justify-between overflow-hidden rounded-xl border border-border bg-card/80 px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-sm backdrop-blur transition-colors hover:border-orange-500/30 hover:bg-orange-500/5"
     >
       {/* Drag handle indicator */}
       <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
@@ -221,25 +221,25 @@ export function FeedTicker() {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-50 h-[112px] overflow-hidden bg-gradient-to-t from-background/90 to-background/60 backdrop-blur-sm"
+      className="fixed inset-x-0 bottom-0 z-50 h-[96px] sm:h-[112px] overflow-hidden bg-gradient-to-t from-background/90 to-background/60 backdrop-blur-sm pb-[env(safe-area-inset-bottom,0px)]"
       onMouseEnter={() => pauseAutoScroll(999999)}
       onMouseLeave={() => pauseAutoScroll(0.5)}
     >
       {/* 左侧标签 */}
-      <div className="absolute bottom-0 left-0 top-0 z-10 flex items-center bg-gradient-to-r from-background via-background/90 to-transparent px-4 pr-12 pointer-events-none">
-        <div className="flex items-center gap-2 rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1.5 shadow-sm backdrop-blur-md">
-          <div className="h-2 w-2 rounded-full bg-orange-500/80 animate-pulse"></div>
-          <span className="text-xs font-semibold tracking-wide text-orange-600 dark:text-orange-400">
-            RSS 最新文章
+      <div className="absolute bottom-[env(safe-area-inset-bottom,0px)] left-0 top-0 z-10 flex items-center bg-gradient-to-r from-background via-background/85 to-transparent px-2 pr-6 sm:px-4 sm:pr-12 pointer-events-none">
+        <div className="flex items-center gap-1.5 sm:gap-2 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 py-1 sm:px-3 sm:py-1.5 shadow-sm backdrop-blur-md">
+          <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-orange-500/80 animate-pulse"></div>
+          <span className="text-[10px] sm:text-xs font-semibold tracking-wide text-orange-600 dark:text-orange-400 whitespace-nowrap">
+            RSS 最新
           </span>
         </div>
       </div>
 
       {/* 右侧中英切换按钮 */}
-      <div className="absolute bottom-0 right-0 top-0 z-10 flex items-center bg-gradient-to-l from-background via-background/90 to-transparent px-4 pl-12">
+      <div className="absolute bottom-[env(safe-area-inset-bottom,0px)] right-0 top-0 z-10 flex items-center bg-gradient-to-l from-background via-background/85 to-transparent px-2 pl-6 sm:px-4 sm:pl-12">
         <button
           onClick={() => setLang((l) => (l === 'zh' ? 'en' : 'zh'))}
-          className="flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-md transition-colors hover:border-orange-500/30 hover:text-foreground"
+          className="flex items-center gap-1 sm:gap-1.5 rounded-full border border-border bg-card/90 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-md transition-colors hover:border-orange-500/30 hover:text-foreground"
         >
           <span className={lang === 'zh' ? 'text-orange-600 dark:text-orange-400' : ''}>中</span>
           <span className="text-border">/</span>
@@ -250,7 +250,7 @@ export function FeedTicker() {
       {/* Scrollable track */}
       <div
         ref={scrollRef}
-        className="flex h-full cursor-grab items-center gap-4 overflow-x-scroll py-2 pl-4 pr-4 active:cursor-grabbing scrollbar-none"
+        className="flex h-full cursor-grab items-center gap-3 sm:gap-4 overflow-x-scroll py-2 pl-3 pr-3 sm:pl-4 sm:pr-4 active:cursor-grabbing scrollbar-none touch-pan-x"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

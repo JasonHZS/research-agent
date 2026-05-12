@@ -62,10 +62,10 @@ function ToolCallItem({ toolCall }: ToolCallItemProps) {
     : '';
 
   return (
-    <div className="flex flex-col border-b border-border/50 last:border-0 text-sm">
+    <div className="flex flex-col border-b border-border/50 last:border-0 text-sm min-w-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 w-full py-2 px-3 hover:bg-muted/50 transition-colors text-left"
+        className="flex items-center gap-2 w-full min-w-0 py-2.5 px-2.5 sm:py-2 sm:px-3 hover:bg-muted/50 transition-colors text-left"
       >
         <div className="shrink-0 text-muted-foreground">
           {isOpen ? (
@@ -77,29 +77,29 @@ function ToolCallItem({ toolCall }: ToolCallItemProps) {
 
         <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
 
-        <div className="flex-1 min-w-0 flex items-center gap-2">
-          <span className="font-medium shrink-0">{toolCall.name}</span>
+        <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
+          <span className="font-medium truncate min-w-0 text-xs sm:text-sm">{toolCall.name}</span>
           {!isOpen && argsString && (
-            <span className="text-muted-foreground truncate opacity-70 text-xs font-mono">
+            <span className="hidden sm:inline text-muted-foreground truncate min-w-0 opacity-70 text-xs font-mono">
               ({argsString})
             </span>
           )}
         </div>
 
         {isRunning && (
-          <Loader2 className="h-3.5 w-3.5 text-primary spinner shrink-0 ml-2" />
+          <Loader2 className="h-3.5 w-3.5 text-primary spinner shrink-0 ml-1 sm:ml-2" />
         )}
         {isCompleted && (
-          <Check className="h-3.5 w-3.5 text-green-500 shrink-0 ml-2" />
+          <Check className="h-3.5 w-3.5 text-green-500 shrink-0 ml-1 sm:ml-2" />
         )}
         {isFailed && (
-          <XCircle className="h-3.5 w-3.5 text-destructive shrink-0 ml-2" />
+          <XCircle className="h-3.5 w-3.5 text-destructive shrink-0 ml-1 sm:ml-2" />
         )}
       </button>
 
       {/* Expanded Details */}
       {isOpen && (
-        <div className="px-9 pb-3 pt-0 text-xs font-mono overflow-x-auto">
+        <div className="px-3 sm:px-9 pb-3 pt-0 text-xs font-mono overflow-x-auto break-all">
           {/* Arguments */}
           {argsString && (
             <div className="mb-2">
@@ -135,7 +135,7 @@ export const ToolCallPanel = memo(function ToolCallPanel({
   return (
     <div
       className={cn(
-        'border border-border rounded-lg bg-card/50 overflow-hidden',
+        'border border-border rounded-lg bg-card/50 overflow-hidden max-w-full min-w-0',
         className
       )}
     >

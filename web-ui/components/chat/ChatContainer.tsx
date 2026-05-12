@@ -231,12 +231,14 @@ export function ChatContainer() {
   return (
     <div className="flex flex-col h-full relative">
       {/* Header - Floating on top */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <h1 className="font-semibold text-lg">Research Agent</h1>
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-background/80 backdrop-blur-sm">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <h1 className="font-semibold text-base sm:text-lg whitespace-nowrap truncate">
+            Research Agent
+          </h1>
           {/* Streaming status indicator */}
           <div
-            className={`w-2 h-2 rounded-full ${
+            className={`shrink-0 w-2 h-2 rounded-full ${
               isStreaming
                 ? 'bg-yellow-500 animate-pulse'
                 : status === 'error'
@@ -245,21 +247,22 @@ export function ChatContainer() {
             }`}
             title={`Status: ${status}`}
           />
-          <div className="w-px h-4 bg-border mx-2" />
+          <div className="hidden sm:block w-px h-4 bg-border mx-2" />
           <Button
             onClick={handleNewChat}
             disabled={isLoading || isStreaming}
             variant="outline"
             size="sm"
-            className="gap-2"
+            className="shrink-0 gap-2 h-8 px-2 sm:h-9 sm:px-3"
+            aria-label="New Chat"
           >
             <Plus className="h-4 w-4" />
-            New Chat
+            <span className="hidden sm:inline">New Chat</span>
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground hidden sm:inline">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground hidden md:inline">
             {currentModelName}
           </span>
           <Button
@@ -267,7 +270,7 @@ export function ChatContainer() {
             size="icon"
             onClick={toggleTheme}
             aria-label="Toggle theme"
-            className="h-9 w-9"
+            className="h-8 w-8 sm:h-9 sm:w-9"
           >
             <Sun className="h-4 w-4 dark:hidden" />
             <Moon className="h-4 w-4 hidden dark:block" />
@@ -276,7 +279,7 @@ export function ChatContainer() {
             variant="ghost"
             size="icon"
             asChild
-            className="h-9 w-9"
+            className="h-8 w-8 sm:h-9 sm:w-9"
           >
             <a
               href="https://github.com/JasonHZS/research-agent"
@@ -295,14 +298,14 @@ export function ChatContainer() {
       <main className="flex-1 flex flex-col min-h-0">
         {!hasMessages ? (
           // Empty State: Centered Layout
-          <div className="flex-1 flex flex-col justify-center pb-[10vh]">
-            <div className="w-full max-w-3xl mx-auto px-4 mb-8">
+          <div className="flex-1 flex flex-col justify-center pb-[4vh] sm:pb-[10vh]">
+            <div className="w-full max-w-3xl mx-auto px-3 sm:px-4 mb-4 sm:mb-8">
               <div className="flex flex-col items-center justify-center text-center">
-                <div className="mb-4 flex items-center justify-center">
-                  <Sun className="w-8 h-8 text-primary animate-[spin_12s_linear_infinite]" />
+                <div className="mb-3 sm:mb-4 flex items-center justify-center">
+                  <Sun className="w-7 h-7 sm:w-8 sm:h-8 text-primary animate-[spin_12s_linear_infinite]" />
                 </div>
-                <h2 className="text-2xl font-semibold mb-2">Start Your Research</h2>
-                <p className="text-muted-foreground max-w-md">
+                <h2 className="text-xl sm:text-2xl font-semibold mb-2">Start Your Research</h2>
+                <p className="text-sm sm:text-base text-muted-foreground max-w-md px-2">
                   Ask me about AI research, recent papers, tech trends, or anything else you&apos;d like to explore.
                 </p>
               </div>

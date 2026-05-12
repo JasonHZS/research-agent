@@ -115,14 +115,14 @@ export function InputArea({
 
   return (
     <div
-      className={cn('bg-background p-4', className)}
+      className={cn('bg-background px-3 py-3 sm:p-4', className)}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       <div className="max-w-3xl mx-auto">
         <div className={cn(
-          "relative flex flex-col gap-2 bg-card border rounded-2xl px-4 py-3 shadow-sm transition-all duration-200 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.4),0_0_40px_hsl(var(--primary)/0.2)] focus-within:border-primary/50",
+          "relative flex flex-col gap-2 bg-card border rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-sm transition-all duration-200 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.4),0_0_40px_hsl(var(--primary)/0.2)] focus-within:border-primary/50",
           isDragOver
             ? "border-orange-500/60 bg-orange-500/5 shadow-[0_0_20px_hsl(24_100%_50%/0.15)]"
             : "border-border"
@@ -169,21 +169,21 @@ export function InputArea({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="w-full resize-none bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground min-h-[60px] max-h-[300px] py-1 scrollbar-thin"
+            className="w-full resize-none bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground min-h-[44px] sm:min-h-[60px] max-h-[300px] py-1 text-[16px] sm:text-sm scrollbar-thin"
           />
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             {/* Deep Research Toggle - only show if enabled or still available to toggle */}
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0">
               {onToggleDeepResearch && (isDeepResearch || canToggleDeepResearch) && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onToggleDeepResearch}
                   className={cn(
-                    "deep-research-btn h-7 gap-1.5 px-3 text-xs font-medium rounded-lg border transition-all duration-200",
-                    isDeepResearch 
-                      ? "active" 
+                    "deep-research-btn h-7 gap-1.5 px-2.5 sm:px-3 text-xs font-medium rounded-lg border transition-all duration-200 shrink-0",
+                    isDeepResearch
+                      ? "active"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted border-transparent"
                   )}
                   title={isDeepResearch ? "Deep Research Mode On" : "Enable Deep Research Mode"}
@@ -193,13 +193,13 @@ export function InputArea({
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0">
               <ModelSelector
                 buttonVariant="ghost"
                 buttonSize="sm"
                 fullWidth={false}
                 align="end"
-                className="h-8 rounded-full px-3 text-xs shrink-0"
+                className="h-8 rounded-full px-2 sm:px-3 text-xs min-w-0 max-w-[160px] sm:max-w-none"
               />
 
               {/* Action button */}
@@ -231,15 +231,15 @@ export function InputArea({
           </div>
         </div>
 
-        {/* Hint text */}
-        <p className="text-xs text-muted-foreground text-center mt-2">
+        {/* Hint text (desktop only — touch devices have no Enter key context) */}
+        <p className="hidden sm:block text-xs text-muted-foreground text-center mt-2">
           Press <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Enter</kbd> to send,{' '}
           <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Shift + Enter</kbd> for new line
         </p>
 
         {/* Example Queries */}
         {showExamples && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 px-4 max-w-2xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-4 sm:mt-6 px-1 sm:px-4 max-w-2xl mx-auto">
           <button
             onClick={() => setInput('今天 hacker news 上有什么关于 AI 的帖子， 帮我总结一下其主要内容和评论区')}
             className="group relative overflow-hidden rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:scale-[1.01] border border-orange-200/50 dark:border-orange-800/30"

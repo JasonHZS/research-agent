@@ -99,15 +99,15 @@ export const TodoSidebar = memo(function TodoSidebar() {
           </button>
         </div>
 
-        <div className="md:hidden fixed right-4 z-20 animate-in slide-in-from-bottom-4 duration-300 safe-bottom-4">
+        <div className="md:hidden fixed right-3 top-[3.25rem] z-20 animate-in slide-in-from-top-4 duration-300">
           <button
             type="button"
             onClick={showTodoSidebar}
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-background/95 px-3 py-2 text-xs font-medium text-foreground shadow-lg backdrop-blur-md transition-colors hover:bg-muted/70"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/95 px-2.5 py-1.5 text-[11px] font-medium text-foreground shadow-md backdrop-blur-md transition-colors hover:bg-muted/70"
             title="显示 TODO"
             aria-label="显示 TODO"
           >
-            <ListTodo className="h-4 w-4 text-primary" />
+            <ListTodo className="h-3.5 w-3.5 text-primary" />
             <span>TODO {completedCount}/{totalCount}</span>
           </button>
         </div>
