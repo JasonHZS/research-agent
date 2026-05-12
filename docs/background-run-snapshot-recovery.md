@@ -68,13 +68,12 @@
 
 关键改动：
 
-- 新增 `StreamingSnapshot`
-- 新增 `BackgroundRun`
-- 新增后台 run 管理：`self._background_runs`
-- 新增事件到快照的聚合逻辑：
-  - `_apply_event_to_snapshot()`
-- 新增基于 LangGraph 状态补齐快照的逻辑：
-  - `_build_snapshot_from_state()`
+- 通过 `BackgroundRunner` 管理后台 run 生命周期
+- 通过 `StreamingSnapshot` 保留断线恢复所需的累计状态
+- 事件到快照的聚合逻辑迁移到 `src/api/services/snapshot.py`：
+  - `apply_event_to_snapshot()`
+- 基于 LangGraph 状态补齐快照的逻辑迁移到 `src/api/services/snapshot.py`：
+  - `build_snapshot_from_state()`
 - 新增后台执行入口：
   - `start_background_run()`
 - 新增订阅入口：

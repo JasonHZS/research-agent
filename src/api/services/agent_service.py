@@ -15,17 +15,6 @@ from src.agent.research_agent import (
 )
 from src.api.schemas.chat import ModelInfo, StreamEvent
 from src.api.services.background_runner import BackgroundRun, BackgroundRunner
-from src.api.services.message_utils import (
-    extract_messages_recursive,
-    format_tool_result,
-    is_error_result,
-    is_stream_disconnect_error,
-    sanitize_tool_args,
-)
-from src.api.services.snapshot import (
-    apply_event_to_snapshot,
-    build_snapshot_from_state,
-)
 from src.api.services.stream_event_processor import StreamEventProcessor
 from src.config.llm_factory import ALIYUN_MODELS, OPENROUTER_MODELS
 from src.config.settings import resolve_runtime_settings
@@ -42,15 +31,6 @@ class AgentService:
     DEEP_RESEARCH_HEARTBEAT_FALLBACK_NODE = "working"
     COMPLETED_RUN_TTL_SECONDS = 30 * 60
 
-    # Compatibility aliases for older tests and call sites that used the static
-    # helpers directly from AgentService.
-    _format_tool_result = staticmethod(format_tool_result)
-    _is_error_result = staticmethod(is_error_result)
-    _is_stream_disconnect_error = staticmethod(is_stream_disconnect_error)
-    _sanitize_tool_args = staticmethod(sanitize_tool_args)
-    _extract_messages_recursive = staticmethod(extract_messages_recursive)
-    _apply_event_to_snapshot = staticmethod(apply_event_to_snapshot)
-
     def __init__(self):
         """Initialize the agent service."""
         self._agents: dict[str, Any] = {}
@@ -63,11 +43,6 @@ class AgentService:
             logger=logger,
             completed_run_ttl_seconds=self.COMPLETED_RUN_TTL_SECONDS,
         )
-
-    @property
-    def _background_runs(self) -> dict[str, BackgroundRun]:
-        """Compatibility view of managed background runs."""
-        return self._background_runner.background_runs
 
     def _get_or_create_agent(
         self,
@@ -173,19 +148,6 @@ class AgentService:
             self._checkpointers.pop((conversation_id, mode), None)
             self._stores.pop((conversation_id, mode), None)
         self._agent_configs.pop(conversation_id, None)
-
-    def _build_snapshot_from_state(
-        self,
-        conversation_id: str,
-        run: BackgroundRun,
-    ) -> dict[str, Any]:
-        """Compatibility wrapper around snapshot state recovery."""
-        return build_snapshot_from_state(
-            agent=self._agents.get(conversation_id),
-            conversation_id=conversation_id,
-            run_snapshot=run.snapshot,
-            logger=logger,
-        )
 
     def start_background_run(
         self,

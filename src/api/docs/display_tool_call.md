@@ -102,11 +102,10 @@ TOOL_CALL_START/END 事件
 
 #### 3.2 递归解析嵌套更新
 
-**添加 `_extract_messages_recursive` 方法**：
+**添加 `message_utils.extract_messages_recursive()` 函数**：
 
 ```python
-@staticmethod
-def _extract_messages_recursive(data: Any, max_depth: int = 5) -> list:
+def extract_messages_recursive(data: Any, max_depth: int = 5) -> list:
     """
     递归提取嵌套节点数据中的消息。
     处理子图更新格式：{"researcher": {"researcher": {"researcher_messages": [...]}}}
@@ -133,7 +132,7 @@ def _extract_messages_recursive(data: Any, max_depth: int = 5) -> list:
         elif isinstance(value, dict):
             # 递归处理嵌套
             all_messages.extend(
-                AgentService._extract_messages_recursive(value, max_depth - 1)
+                extract_messages_recursive(value, max_depth - 1)
             )
     
     return all_messages
@@ -227,7 +226,7 @@ sequenceDiagram
     Note over Clarify: render_tool_calls (后台打印)
     Clarify-->>Graph: update{tool_calls_log: [...]}
     Graph-->>API: updates 事件
-    API->>API: _extract_messages_recursive
+    API->>API: message_utils.extract_messages_recursive
     API-->>FE: TOOL_CALL_START/END
     
     Graph->>Researcher: Send API 并行派发
@@ -235,7 +234,7 @@ sequenceDiagram
     Note over Researcher: render_tool_calls (后台打印)
     Researcher-->>Graph: output{sections, tool_calls_log}
     Graph-->>API: updates 事件
-    API->>API: _extract_messages_recursive
+    API->>API: message_utils.extract_messages_recursive
     API-->>FE: TOOL_CALL_START/END
     
     FE->>FE: ToolCallPanel 渲染

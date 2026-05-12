@@ -51,7 +51,9 @@ async def test_background_run_completes_without_active_subscriber(monkeypatch: p
 
 
 @pytest.mark.asyncio
-async def test_resume_subscription_receives_snapshot_from_graph_state(monkeypatch: pytest.MonkeyPatch):
+async def test_resume_subscription_receives_snapshot_from_graph_state(
+    monkeypatch: pytest.MonkeyPatch,
+):
     service = AgentService()
 
     async def fake_stream_agent_events(**_kwargs):
@@ -271,7 +273,6 @@ async def test_completed_run_ttl_is_enforced_on_resume_lookup(monkeypatch: pytes
     run.completed_at = time.monotonic() - service.COMPLETED_RUN_TTL_SECONDS - 1
 
     assert service.has_background_run("expired-run") is False
-    assert "expired-run" not in service._background_runs
 
     with pytest.raises(ValueError, match="No background run found"):
         async for _event in service.subscribe_to_run("expired-run"):
