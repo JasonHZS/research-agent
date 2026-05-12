@@ -28,6 +28,7 @@ ss -tlnp
 云服务器需在控制台单独放行端口，本机监听 `0.0.0.0` 不代表外网可访问。
 
 **必须放行**：
+
 - TCP 80（HTTP）
 - TCP 443（HTTPS）
 - TCP 22（SSH，通常默认已有）
@@ -113,10 +114,12 @@ cp -r .next/static .next/standalone/.next/static
 
 ### 4.1 橙云 vs 灰云
 
-| 状态 | 说明 |
-|------|------|
-| 灰云（仅 DNS） | 直连源站，无 CDN |
-| 橙云（已代理） | 经 Cloudflare CDN，可加速、隐藏 IP |
+
+| 状态        | 说明                         |
+| --------- | -------------------------- |
+| 灰云（仅 DNS） | 直连源站，无 CDN                 |
+| 橙云（已代理）   | 经 Cloudflare CDN，可加速、隐藏 IP |
+
 
 ### 4.2 开启橙云前必须设置
 
@@ -129,6 +132,7 @@ cp -r .next/static .next/standalone/.next/static
 **重要**：Cloudflare 免费版会缓冲 SSE 响应，导致流式输出延迟或断连。
 
 **建议**：
+
 - 前端域名：可开橙云，享受 CDN
 - API 子域名（如 `api.your-domain.com`）：保持**灰云**，直连服务器
 
