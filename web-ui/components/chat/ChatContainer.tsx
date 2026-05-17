@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus, Sun, Moon } from 'lucide-react';
 import { useAuth, UserButton } from '@clerk/nextjs';
 import { GithubIcon } from '@/components/ui/icons';
@@ -66,6 +66,42 @@ export function ChatContainer() {
   } = useChatStore();
 
   const hasMessages = currentMessages.length > 0 || streamingMessage;
+
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [mobileInputCollapsed, setMobileInputCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      return;
+    }
+    const mq = window.matchMedia('(max-width: 639px)');
+    const update = () => {
+      setIsMobileViewport(mq.matches);
+      if (!mq.matches) {
+        setMobileInputCollapsed(false);
+      }
+    };
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMessages) {
+      setMobileInputCollapsed(false);
+    }
+  }, [hasMessages]);
+
+  const handleViewportAtBottomChange = useCallback((atBottom: boolean) => {
+    if (!isMobileViewport) return;
+    if (!atBottom) {
+      setMobileInputCollapsed(true);
+    }
+  }, [isMobileViewport]);
+
+  const expandMobileInput = useCallback(() => {
+    setMobileInputCollapsed(false);
+  }, []);
 
   // Handle stream messages
   const handleStreamMessage = useCallback(
@@ -330,7 +366,10 @@ export function ChatContainer() {
         ) : (
           // Active State: Standard Chat Layout
           <>
-            <MessageList className="flex-1" />
+            <MessageList
+              className="flex-1"
+              onViewportAtBottomChange={handleViewportAtBottomChange}
+            />
             <InputArea
               onSend={handleSend}
               onStop={handleStop}
@@ -345,6 +384,8 @@ export function ChatContainer() {
               droppedFeedCard={droppedFeedCard}
               onDropFeedCard={setDroppedFeedCard}
               onClearDroppedCard={clearDroppedFeedCard}
+              mobileDockCollapsed={isMobileViewport && mobileInputCollapsed}
+              onMobileDockExpand={expandMobileInput}
             />
           </>
         )}
