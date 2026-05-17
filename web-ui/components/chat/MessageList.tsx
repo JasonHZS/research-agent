@@ -10,13 +10,16 @@ import { cn } from '@/lib/utils';
 
 interface MessageListProps {
   className?: string;
+  /** Fires when the scroll viewport crosses the bottom threshold (mobile dock collapse). */
+  onViewportAtBottomChange?: (atBottom: boolean) => void;
 }
 
-export function MessageList({ className }: MessageListProps) {
+export function MessageList({ className, onViewportAtBottomChange }: MessageListProps) {
   const { currentMessages, streamingMessage, progressNode } = useChatStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const prevAtBottomRef = useRef(true);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
@@ -42,20 +45,28 @@ export function MessageList({ className }: MessageListProps) {
   }, [autoScrollEnabled, isViewportAtBottom]);
 
   // Scroll detection logic
-  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    const target = event.currentTarget;
-    const { scrollTop, scrollHeight, clientHeight } = target;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50; // 50px threshold
+  const handleScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const target = event.currentTarget;
+      const { scrollTop, scrollHeight, clientHeight } = target;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50; // 50px threshold
 
-    if (isAtBottom) {
-      // User reached bottom - hide button and re-enable auto-scroll
-      setShowScrollButton(false);
-      setAutoScrollEnabled(true);
-    } else if (!autoScrollEnabled) {
-      // User is not at bottom and auto-scroll is disabled - show button
-      setShowScrollButton(true);
-    }
-  }, [autoScrollEnabled]);
+      if (prevAtBottomRef.current !== isAtBottom) {
+        prevAtBottomRef.current = isAtBottom;
+        onViewportAtBottomChange?.(isAtBottom);
+      }
+
+      if (isAtBottom) {
+        // User reached bottom - hide button and re-enable auto-scroll
+        setShowScrollButton(false);
+        setAutoScrollEnabled(true);
+      } else if (!autoScrollEnabled) {
+        // User is not at bottom and auto-scroll is disabled - show button
+        setShowScrollButton(true);
+      }
+    },
+    [autoScrollEnabled, onViewportAtBottomChange],
+  );
 
   // Resume auto-scroll button handler
   const scrollToBottom = useCallback(() => {

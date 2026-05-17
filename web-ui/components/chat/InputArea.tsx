@@ -1,7 +1,17 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Send, StopCircle, Loader2, Newspaper, ScrollText, ArrowRight, X, FileText } from 'lucide-react';
+import {
+  Send,
+  StopCircle,
+  Loader2,
+  Newspaper,
+  ScrollText,
+  ArrowRight,
+  X,
+  FileText,
+  ChevronUp,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ModelSelector } from '@/components/sidebar/ModelSelector';
 import { cn } from '@/lib/utils';
@@ -25,6 +35,9 @@ interface InputAreaProps {
   droppedFeedCard?: FeedDigestItem | null;
   onDropFeedCard?: (card: FeedDigestItem) => void;
   onClearDroppedCard?: () => void;
+  /** Narrow viewports only: collapse to a single-line bar while reading chat */
+  mobileDockCollapsed?: boolean;
+  onMobileDockExpand?: () => void;
 }
 
 export function InputArea({
@@ -42,10 +55,13 @@ export function InputArea({
   droppedFeedCard,
   onDropFeedCard,
   onClearDroppedCard,
+  mobileDockCollapsed = false,
+  onMobileDockExpand,
 }: InputAreaProps) {
   const [input, setInput] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const prevDockCollapsedRef = useRef(false);
 
   // Auto-resize textarea
   const adjustHeight = useCallback(() => {
@@ -59,6 +75,30 @@ export function InputArea({
   useEffect(() => {
     adjustHeight();
   }, [input, adjustHeight]);
+
+  useEffect(() => {
+    if (prevDockCollapsedRef.current && !mobileDockCollapsed) {
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+        adjustHeight();
+      });
+    }
+    prevDockCollapsedRef.current = mobileDockCollapsed;
+  }, [mobileDockCollapsed, adjustHeight]);
+
+  const handleExpandDock = useCallback(() => {
+    onMobileDockExpand?.();
+  }, [onMobileDockExpand]);
+
+  const handleCollapsedKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleExpandDock();
+      }
+    },
+    [handleExpandDock],
+  );
 
   // Handle submit
   const handleSubmit = useCallback(() => {
@@ -113,6 +153,15 @@ export function InputArea({
     }
   }, [onDropFeedCard]);
 
+  const collapsedPreview =
+    droppedFeedCard && !input.trim()
+      ? `已附加文章 · ${droppedFeedCard.latest_title_zh ?? droppedFeedCard.latest_title ?? '点击查看'}`
+      : droppedFeedCard && input.trim()
+        ? `${input}`
+        : input.trim()
+          ? input
+          : placeholder;
+
   return (
     <div
       className={cn('bg-background px-3 py-3 sm:p-4', className)}
@@ -121,6 +170,69 @@ export function InputArea({
       onDrop={handleDrop}
     >
       <div className="max-w-3xl mx-auto">
+        {mobileDockCollapsed ? (
+          <div
+            className={cn(
+              'relative flex items-center gap-2 bg-card border rounded-2xl px-3 py-2 shadow-sm transition-all duration-200 min-h-[48px] border-border',
+              isDragOver &&
+                'border-orange-500/60 bg-orange-500/5 shadow-[0_0_20px_hsl(24_100%_50%/0.15)]',
+            )}
+          >
+            {isDragOver && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-orange-500/50 bg-orange-500/5">
+                <span className="text-xs font-medium text-orange-600 dark:text-orange-400">拖放文章到此处</span>
+              </div>
+            )}
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="展开输入框"
+              className="flex min-w-0 flex-1 touch-manipulation items-center py-1 outline-none"
+              onClick={handleExpandDock}
+              onKeyDown={handleCollapsedKeyDown}
+            >
+              <span
+                className={cn(
+                  'truncate text-left text-[16px] sm:text-sm',
+                  input.trim() || droppedFeedCard ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {collapsedPreview}
+              </span>
+            </div>
+            <div className="flex shrink-0 items-center gap-0.5">
+              {isStreaming ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStop?.();
+                  }}
+                  className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  aria-label="停止生成"
+                >
+                  <StopCircle className="h-5 w-5" />
+                </Button>
+              ) : input.trim() ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSubmit();
+                  }}
+                  disabled={disabled}
+                  className="h-9 w-9 text-primary hover:text-primary hover:bg-primary/10 disabled:opacity-50"
+                  aria-label="发送"
+                >
+                  {disabled ? <Loader2 className="h-5 w-5 spinner" /> : <Send className="h-5 w-5" />}
+                </Button>
+              ) : null}
+              <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
+            </div>
+          </div>
+        ) : (
         <div className={cn(
           "relative flex flex-col gap-2 bg-card border rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-sm transition-all duration-200 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.4),0_0_40px_hsl(var(--primary)/0.2)] focus-within:border-primary/50",
           isDragOver
@@ -230,6 +342,7 @@ export function InputArea({
             </div>
           </div>
         </div>
+        )}
 
         {/* Hint text (desktop only — touch devices have no Enter key context) */}
         <p className="hidden sm:block text-xs text-muted-foreground text-center mt-2">
